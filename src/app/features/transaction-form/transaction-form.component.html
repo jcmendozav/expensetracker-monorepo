@@ -1,0 +1,43 @@
+<div class="form-card">
+  <h3>➕ Add New Transaction</h3>
+
+  <form [formGroup]="transactionForm" (ngSubmit)="onSubmit()">
+
+    <div class="form-group">
+      <label>Description</label>
+      <input type="text" formControlName="description" placeholder="e.g. Weekly Groceries"
+        [class.invalid]="transactionForm.get('description')?.invalid && transactionForm.get('description')?.touched">
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label>Amount</label>
+        <input type="number" formControlName="originalAmount" placeholder="0.00">
+      </div>
+
+      <div class="form-group">
+        <label>Currency</label>
+        <select formControlName="originalCurrency">
+          <option value="USD">USD ($)</option>
+          <option value="EUR">EUR (€)</option>
+          <option value="GBP">GBP (£)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Date</label>
+      <input type="date" formControlName="transactionDate">
+    </div>
+
+    <div class="button-group">
+      <button type="submit" [disabled]="transactionForm.invalid || isSubmitting">
+        {{ editTransactionId ? 'Update Transaction' : 'Save Transaction' }}
+      </button>
+
+      <button type="button" *ngIf="editTransactionId" (click)="cancelEdit()" class="btn-cancel">
+        Cancel
+      </button>
+    </div>
+  </form>
+</div>

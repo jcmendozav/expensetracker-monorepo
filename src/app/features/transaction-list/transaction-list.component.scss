@@ -1,0 +1,144 @@
+/* Main Container */
+.list-container {
+  max-width: 800px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.list-header h2 {
+  color: #2c3e50;
+  margin: 0;
+}
+
+/* The Transaction Card */
+.transaction-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+  border-left: 5px solid #3498db; /* Blue accent bar */
+}
+
+.transaction-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
+}
+
+/* Left Side: Date & Description */
+.trans-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trans-date {
+  font-size: 0.85rem;
+  color: #7f8c8d;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.trans-desc {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.trans-meta {
+  font-size: 0.85rem;
+  color: #95a5a6;
+  display: flex;
+  gap: 10px;
+}
+
+/* Right Side: Amount & Actions */
+.trans-right {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.trans-amount {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #e74c3c; /* Red for expense */
+}
+
+.trans-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0; /* Hidden by default for cleaner look */
+  transition: opacity 0.2s;
+}
+
+/* Show buttons when hovering the card */
+.transaction-card:hover .trans-actions {
+  opacity: 1;
+}
+
+/* Buttons */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  border-radius: 4px;
+  transition: background 0.2s;
+  font-size: 1.2rem; /* Size for emojis */
+}
+
+.btn-edit:hover {
+  background-color: #f1c40f20; /* Light yellow bg */
+}
+
+.btn-delete:hover {
+  background-color: #e74c3c20; /* Light red bg */
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #95a5a6;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 2px dashed #e0e0e0;
+}
+
+/* Loading Spinner Container */
+.loading-container {
+  text-align: center;
+  padding: 2rem;
+  color: #7f8c8d;
+}
+
+/* 📱 Mobile Responsiveness */
+@media (max-width: 600px) {
+  .transaction-card {
+    padding: 1rem;
+  }
+  
+  /* On mobile, always show action buttons */
+  .trans-actions {
+    opacity: 1; 
+  }
+
+  .trans-desc {
+    font-size: 1rem;
+  }
+}

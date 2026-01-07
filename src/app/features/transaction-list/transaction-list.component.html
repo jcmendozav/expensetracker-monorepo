@@ -1,0 +1,36 @@
+<div class="list-container">
+  <div class="list-header">
+    <h2>Recent Transactions</h2>
+  </div>
+
+  <div *ngIf="isLoading" class="loading-container">
+    Loading...
+  </div>
+
+  <div *ngFor="let t of transactions" class="transaction-card">
+    
+    <div class="trans-details">
+      <span class="trans-date">{{ t.transactionDate | date:'mediumDate' }}</span>
+      <span class="trans-desc">{{ t.description }}</span>
+      <div class="trans-meta">
+        <span>Category: {{ t.categoryId }}</span>
+      </div>
+    </div>
+
+    <div class="trans-right">
+      <span class="trans-amount">
+        {{ t.originalAmount | currency: t.originalCurrency }}
+      </span>
+      
+      <div class="trans-actions">
+        <button (click)="onEdit(t)" class="btn-icon btn-edit" title="Edit">✏️</button>
+        <button (click)="onDelete(t.id!)" class="btn-icon btn-delete" title="Delete">🗑️</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div *ngIf="!isLoading && transactions.length === 0" class="empty-state">
+    <p>No transactions found. Add one above!</p>
+  </div>
+</div>

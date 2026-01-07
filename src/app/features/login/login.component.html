@@ -1,0 +1,30 @@
+<div class="login-container">
+  <div class="login-card">
+    <h2>Welcome Back</h2>
+    <p>Please sign in to continue</p>
+    
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" [(ngModel)]="email" placeholder="user@example.com">
+    </div>
+
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" [(ngModel)]="password" placeholder="••••••••">
+    </div>
+
+    <div *ngIf="errorMessage" class="error-msg">
+      {{ errorMessage }}
+    </div>
+
+    <button (click)="onLogin()" [disabled]="isLoading" class="btn-login">
+      {{ isLoading ? 'Signing in...' : 'Sign In' }}
+    </button>
+    
+    <div class="divider">OR</div>
+
+    <button (click)="onGoogleLogin()" class="btn-google">
+      Sign in with Google
+    </button>
+  </div>
+</div>
