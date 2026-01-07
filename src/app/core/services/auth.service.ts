@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import {
   Auth,
   browserSessionPersistence,
@@ -9,8 +10,7 @@ import {
   user,
   User,
   getIdToken,
-  signInWithRedirect,
-  getRedirectResult
+  getRedirectResult,
 } from '@angular/fire/auth';
 import { setPersistence } from 'firebase/auth';
 import { from, Observable } from 'rxjs';
@@ -19,11 +19,12 @@ import { from, Observable } from 'rxjs';
   providedIn: 'root',
 })
 export class AuthService {
-  user$: Observable<User | null>;
+  private auth: Auth = inject(Auth);
+  private user$ = user(this.auth);
+  user = toSignal(this.user$, { initialValue: this.auth.currentUser });
 
-  constructor(private auth: Auth) {
+  constructor() {
     this.setSessionStoragePersistence();
-    this.user$ = user(this.auth);
   }
 
   private setSessionStoragePersistence(): void {
@@ -31,13 +32,11 @@ export class AuthService {
   }
 
   login(email: string, password: string): Observable<void> {
-    const promise = signInWithEmailAndPassword(
-      this.auth,
-      email,
-      password
-    ).then(() => {
-      //
-    });
+    const promise = signInWithEmailAndPassword(this.auth, email, password).then(
+      () => {
+        //
+      }
+    );
     return from(promise);
   }
 
@@ -63,9 +62,9 @@ export class AuthService {
   }
 
   /**
- * Retrieves the current JWT (ID Token). 
- * This is used by the HttpInterceptor to talk to Spring Boot.
- */
+   * Retrieves the current JWT (ID Token).
+   * This is used by the HttpInterceptor to talk to Spring Boot.
+   */
   async getToken(): Promise<string | null> {
     const currentUser = this.auth.currentUser;
     if (!currentUser) return null;

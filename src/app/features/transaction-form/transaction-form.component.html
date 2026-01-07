@@ -31,12 +31,12 @@
     </div>
 
     <div class="button-group">
-      <button type="submit" [disabled]="transactionForm.invalid || isSubmitting">
-        {{ editTransactionId ? 'Update Transaction' : 'Save Transaction' }}
+      <button type="submit" [disabled]="transactionForm.invalid || isSubmitting()">
+        {{ editTransactionId() ? 'Update Transaction' : 'Save Transaction' }}
       </button>
 
-      @if (editTransactionId) {
-        <button type="button" (click)="cancelEdit()" class="btn-cancel">
+      @if (editTransactionId()) {
+        <button type="button" class="btn-cancel">
           Cancel
         </button>
       }

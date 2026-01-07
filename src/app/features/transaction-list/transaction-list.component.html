@@ -3,13 +3,13 @@
     <h2>Recent Transactions</h2>
   </div>
 
-  @if (isLoading) {
+  @if (isLoading()) {
     <div class="loading-container">
       Loading...
     </div>
   }
 
-  @for (t of transactions; track t) {
+  @for (t of transactions(); track t.id) {
     <div class="transaction-card">
       <div class="trans-details">
         <span class="trans-date">{{ t.transactionDate | date:'mediumDate' }}</span>
@@ -28,9 +28,7 @@
         </div>
       </div>
     </div>
-  }
-
-  @if (!isLoading && transactions.length === 0) {
+  } @empty {
     <div class="empty-state">
       <p>No transactions found. Add one above!</p>
     </div>

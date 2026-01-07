@@ -4,7 +4,7 @@
   <div class="dashboard-stats">
     <div class="stat-card expense">
       <h3>Total Spent</h3>
-      <div class="value">{{ totalSpent | currency:'USD' }}</div>
+      <div class="value">{{ totalSpent() | currency:'USD' }}</div>
     </div>
   </div>
 
@@ -12,10 +12,10 @@
 
   <div class="content-grid">
     <div class="left-panel">
-      <app-transaction-form (transactionAdded)="onTransactionAdded()"></app-transaction-form>
+      <app-transaction-form [transaction]="selectedTransaction()" (transactionAdded)="onTransactionAdded()"></app-transaction-form>
     </div>
     <div class="right-panel">
-      <app-transaction-list (edit)="onEditTransaction($event)">
+      <app-transaction-list [refresh]="refresh()" (edit)="onEditTransaction($event)">
       </app-transaction-list>
     </div>
   </div>

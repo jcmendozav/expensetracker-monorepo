@@ -11,14 +11,13 @@ const authGuard = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  return authService.user$.pipe(
-    take(1),
-    map(user => {
-      if (user) return true;
-      router.navigate(['/login']);
-      return false;
-    })
-  );
+  // Access the signal directly
+  const user = authService.user();
+
+  if (user) return true;
+
+  router.navigate(['/login']);
+  return false;
 };
 
 export const routes: Routes = [

@@ -1,59 +1,57 @@
-import { Component, OnInit, inject, ViewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TransactionService } from '../../core/services/transaction.service';
 import { TransactionListComponent } from '../transaction-list/transaction-list.component';
 import { TransactionFormComponent } from '../transaction-form/transaction-form.component';
 import { Transaction } from '../../core/models/transaction.model';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [CommonModule, TransactionListComponent, TransactionFormComponent],
   templateUrl: './dashboard.component.html',
-  styleUrls: ['./dashboard.component.scss']
+  styleUrls: ['./dashboard.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent {
   private transactionService = inject(TransactionService);
-  @ViewChild(TransactionListComponent) transactionList!: TransactionListComponent;
-  @ViewChild(TransactionFormComponent) transactionForm!: TransactionFormComponent;
 
-  totalSpent: number = 0;
-  isLoading: boolean = true;
+  totalSpent = signal(0);
+  isLoading = signal(true);
+  refresh = signal(0);
+  selectedTransaction = signal<Transaction | null>(null);
 
-  ngOnInit() {
-    this.transactionService.getDashboardSummary().subscribe({
-      next: (data) => {
-        this.totalSpent = data.totalSpent;
-        this.isLoading = false;
-      },
-      error: (err) => {
+  constructor() {
+    effect(async () => {
+      this.refresh(); // re-run when refresh changes
+      this.isLoading.set(true);
+      try {
+        const data = await firstValueFrom(this.transactionService.getDashboardSummary());
+        this.totalSpent.set(data.totalSpent);
+      } catch (err) {
         console.error('Failed to load dashboard stats', err);
-        this.isLoading = false;
+      } finally {
+        this.isLoading.set(false);
       }
     });
   }
 
-  // Add this method inside your class
   refreshSummary() {
-    this.isLoading = true; // Optional: show spinner briefly
-    this.transactionService.getDashboardSummary().subscribe(data => {
-      this.totalSpent = data.totalSpent;
-      this.isLoading = false;
-    });
+    this.refresh.update(v => v + 1);
   }
 
   onTransactionAdded() {
-    // Refresh the list
-    this.transactionList.loadTransactions();
-    // Refresh the stats
+    // Refresh the stats, which will also refresh the list
     this.refreshSummary();
+    // Reset the selected transaction
+    this.selectedTransaction.set(null);
   }
 
   onEditTransaction(transaction: Transaction) {
     // Scroll to top so user sees the form
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Call the method we created in Step 2
-    this.transactionForm.setFormData(transaction);
+    // Set the selected transaction
+    this.selectedTransaction.set(transaction);
   }
 }
