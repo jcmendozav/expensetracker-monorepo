@@ -1,17 +1,16 @@
-<nav class="navbar" *ngIf="authService.user$ | async as user">
-
+@if (authService.user$ | async; as user) {
+  <nav class="navbar">
     <div class="brand">
-        <span class="logo">💰</span> ExpenseTracker
+      <span class="logo">💰</span> ExpenseTracker
     </div>
-
     <div class="user-info">
-        <span class="user-name">
-            {{ user.displayName || user.email }}
-        </span>
-
-        <img *ngIf="user.photoURL" [src]="user.photoURL" alt="Profile" class="avatar">
-
-        <button (click)="logout()" class="btn-logout">Logout</button>
+      <span class="user-name">
+        {{ user.displayName || user.email }}
+      </span>
+      @if (user.photoURL) {
+        <img [src]="user.photoURL" alt="Profile" class="avatar">
+      }
+      <button (click)="logout()" class="btn-logout">Logout</button>
     </div>
-
-</nav>
+  </nav>
+}

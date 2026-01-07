@@ -35,9 +35,11 @@
         {{ editTransactionId ? 'Update Transaction' : 'Save Transaction' }}
       </button>
 
-      <button type="button" *ngIf="editTransactionId" (click)="cancelEdit()" class="btn-cancel">
-        Cancel
-      </button>
+      @if (editTransactionId) {
+        <button type="button" (click)="cancelEdit()" class="btn-cancel">
+          Cancel
+        </button>
+      }
     </div>
   </form>
 </div>
