@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Firebase Token Generator</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        input, button, textarea { padding: 10px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        textarea { height: 100px; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+
+    <h2>Firebase ID Token Generator</h2>
+    <p>Please use a user registered in your Firebase Console.</p>
+
+    <script>
+        // *** 1. REPLACE THIS WITH YOUR ACTUAL FIREBASE CONFIG ***
+        const firebaseConfig = {
+              apiKey: "AIzaSyAtcVAoznrrWsEwgxDZCKifdDRhYNfbDDI",
+  authDomain: "expense-tracker-gcp-481004.firebaseapp.com",
+  projectId: "expense-tracker-gcp-481004",
+  storageBucket: "expense-tracker-gcp-481004.firebasestorage.app",
+  messagingSenderId: "1047571572972",
+  appId: "1:1047571572972:web:3ed04d6d2a7c6268321dc9",
+  measurementId: "G-97FVDLKF55"
+        };
+        // ********************************************************
+
+        // Initialize Firebase App
+        let firebaseApp;
+        try {
+             firebaseApp = firebase.initializeApp(firebaseConfig);
+        } catch (e) {
+             console.error("Firebase Initialization Error. Check your config!", e);
+        }
+
+        const auth = firebase.auth();
+
+        function getToken() {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const outputElement = document.getElementById('tokenOutput');
+            const statusElement = document.getElementById('statusMessage');
+            
+            outputElement.value = "Generating token...";
+            statusElement.className = '';
+            statusElement.textContent = '';
+
+            auth.signInWithEmailAndPassword(email, password)
+                .then((userCredential) => {
+                    return userCredential.user.getIdToken();
+                })
+                .then(idToken => {
+                    outputElement.value = idToken;
+                    statusElement.className = 'success';
+                    statusElement.textContent = 'Token generated successfully. Copy it now!';
+                })
+                .catch((error) => {
+                    outputElement.value = "Token generation failed.";
+                    statusElement.className = 'error';
+                    statusElement.textContent = `Error: ${error.message}`;
+                    console.error(error);
+                });
+        }
+    </script>
+
+    <div>
+        <label for="email">Email:</label>
+        <input type="email" id="email" value="test@example.com" required>
+    </div>
+    <div>
+        <label for="password">Password:</label>
+        <input type="password" id="password" value="password123" required>
+    </div>
+    
+    <button onclick="getToken()">Get ID Token</button>
+    
+    <p id="statusMessage"></p>
+    
+    <div>
+        <label for="tokenOutput">Token Output (Copy this):</label>
+        <textarea id="tokenOutput" readonly></textarea>
+    </div>
+
+</body>
+</html>
