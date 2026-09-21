@@ -123,27 +123,22 @@ public class TransactionService {
     }
 
     public List<Transaction> getTransactionsByUserId(String userId) throws ExecutionException, InterruptedException {
-        Firestore db = FirestoreClient.getFirestore();
-
-        // Create a query to find transactions belonging to this user
-        Query query = db.collection("transactions").whereEqualTo("userId", userId);
+        Query query = firestore.collection(COLLECTION_NAME).whereEqualTo("userId", userId);
 
         ApiFuture<QuerySnapshot> querySnapshot = query.get();
 
         return querySnapshot.get().getDocuments().stream()
                 .map(doc -> {
                     Transaction t = doc.toObject(Transaction.class);
-                    t.setId(doc.getId()); // Ensure the Firestore Doc ID is mapped to the object
+                    t.setId(doc.getId());
                     return t;
                 })
                 .collect(Collectors.toList());
     }
 
     public void deleteTransaction(String documentId, String currentUserId) throws Exception {
-        Firestore db = FirestoreClient.getFirestore();
-        DocumentReference docRef = db.collection("transactions").document(documentId);
+        DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(documentId);
 
-        // Log for debugging
         System.out.println("Attempting to delete doc: " + documentId + " for user: " + currentUserId);
 
         DocumentSnapshot document = docRef.get().get();
@@ -156,7 +151,6 @@ public class TransactionService {
         String ownerId = document.getString("userId");
         System.out.println("Document owner in Firestore: " + ownerId);
 
-        // Use Objects.equals to safely handle nulls
         if (ownerId != null && ownerId.equals(currentUserId)) {
             docRef.delete().get();
             System.out.println("✅ Delete successful");
@@ -167,16 +161,12 @@ public class TransactionService {
     }
 
     public Double getTotalSpent(String userId) throws ExecutionException, InterruptedException {
-        Firestore db = FirestoreClient.getFirestore();
-
-        // Query: "Select * from transactions where userId = X"
-        ApiFuture<QuerySnapshot> query = db.collection("transactions")
+        ApiFuture<QuerySnapshot> query = firestore.collection(COLLECTION_NAME)
                 .whereEqualTo("userId", userId)
                 .get();
 
         List<QueryDocumentSnapshot> documents = query.get().getDocuments();
 
-        // Sum the 'originalAmount' field safely
         return documents.stream()
                 .mapToDouble(doc -> {
                     Double amount = doc.getDouble("originalAmount");
@@ -186,25 +176,19 @@ public class TransactionService {
     }
 
     public void updateTransaction(String id, Transaction updatedTransaction, String currentUserId) throws Exception {
-        Firestore db = FirestoreClient.getFirestore();
-        DocumentReference docRef = db.collection("transactions").document(id);
+        DocumentReference docRef = firestore.collection(COLLECTION_NAME).document(id);
 
-        // 1. Fetch existing document to check ownership
         DocumentSnapshot document = docRef.get().get();
 
         if (document.exists()) {
             String ownerId = document.getString("userId");
 
-            // 2. Security Check
             if (ownerId != null && ownerId.equals(currentUserId)) {
-                // 3. Update fields
-                // We use a Map to specify exactly which fields to update
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("description", updatedTransaction.getDescription());
                 updates.put("originalAmount", updatedTransaction.getOriginalAmount());
                 updates.put("originalCurrency", updatedTransaction.getOriginalCurrency());
                 updates.put("transactionDate", updatedTransaction.getTransactionDate());
-                // Don't update userId or id!
 
                 docRef.update(updates).get();
             } else {

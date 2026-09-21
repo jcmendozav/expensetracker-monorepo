@@ -1,42 +1,25 @@
 {
-  // For more information, visit: https://go.microsoft.com/fwlink/?LinkId=733558
   "version": "2.0.0",
   "tasks": [
     {
-      "type": "npm",
-      "script": "start",
+      "label": "Run Spring Boot Backend",
+      "type": "shell",
+      "command": "./gradlew bootRun",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
       "isBackground": true,
-      "problemMatcher": {
-        "owner": "typescript",
-        "pattern": "$tsc",
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": {
-            "regexp": "(.*?)"
-          },
-          "endsPattern": {
-            "regexp": "bundle generation complete"
-          }
-        }
-      }
+      "problemMatcher": []
     },
     {
-      "type": "npm",
-      "script": "test",
+      "label": "Run Angular Frontend",
+      "type": "shell",
+      "command": "npm start",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
       "isBackground": true,
-      "problemMatcher": {
-        "owner": "typescript",
-        "pattern": "$tsc",
-        "background": {
-          "activeOnStart": true,
-          "beginsPattern": {
-            "regexp": "(.*?)"
-          },
-          "endsPattern": {
-            "regexp": "bundle generation complete"
-          }
-        }
-      }
+      "problemMatcher": []
     }
   ]
 }

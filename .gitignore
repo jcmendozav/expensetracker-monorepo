@@ -12,9 +12,11 @@
 !tsconfig*.json
 !angular.json
 
-# Backend (Spring Boot / Maven / GCP)
+# Backend (Spring Boot / Gradle / GCP)
+.gradle/
+backend/.gradle/
+backend/build/
 backend/target/
-backend/.mvn/
 backend/*.jar
 backend/*.war
 
