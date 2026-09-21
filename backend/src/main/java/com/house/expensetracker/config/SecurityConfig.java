@@ -61,8 +61,15 @@ public class SecurityConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/api/**")
-                        .allowedOrigins("http://localhost:4200", "http://127.0.0.1:4200")
-                        .allowedMethods("GET", "POST", "PUT", "DELETE")
+                        .allowedOriginPatterns(
+                                "http://localhost:4200",
+                                "http://127.0.0.1:4200",
+                                "https://expense-tracker-gcp-481004.web.app",
+                                "https://expense-tracker-gcp-481004.firebaseapp.com",
+                                "https://*.web.app",
+                                "https://*.firebaseapp.com"
+                        )
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);
             }
