@@ -1,0 +1,22 @@
+<div class="container">
+  <h1>💰 My Expense Tracker</h1>
+
+  <div class="dashboard-stats">
+    <div class="stat-card expense">
+      <h3>Total Spent</h3>
+      <div class="value">{{ totalSpent() | currency:'USD' }}</div>
+    </div>
+  </div>
+
+  <hr>
+
+  <div class="content-grid">
+    <div class="left-panel">
+      <app-transaction-form [transaction]="selectedTransaction()" (transactionAdded)="onTransactionAdded()"></app-transaction-form>
+    </div>
+    <div class="right-panel">
+      <app-transaction-list [refresh]="refresh()" (edit)="onEditTransaction($event)">
+      </app-transaction-list>
+    </div>
+  </div>
+</div>

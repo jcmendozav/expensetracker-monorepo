@@ -1,0 +1,16 @@
+@if (authService.user(); as user) {
+  <nav class="navbar">
+    <div class="brand" [routerLink]="['/dashboard']">
+      <span class="logo">💰</span> ExpenseTracker
+    </div>
+    <div class="user-info">
+      <span class="user-name">
+        {{ user.displayName || user.email }}
+      </span>
+      @if (user.photoURL) {
+        <img [ngSrc]="user.photoURL" width="32" height="32" alt="Profile" class="avatar">
+      }
+      <button (click)="logout()" class="btn-logout">Logout</button>
+    </div>
+  </nav>
+}
