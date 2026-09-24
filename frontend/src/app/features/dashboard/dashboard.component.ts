@@ -5,11 +5,12 @@ import { TransactionListComponent } from '../transaction-list/transaction-list.c
 import { TransactionFormComponent } from '../transaction-form/transaction-form.component';
 import { Transaction } from '../../core/models/transaction.model';
 import { firstValueFrom } from 'rxjs';
+import { MatCardModule } from '@angular/material/card';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, TransactionListComponent, TransactionFormComponent],
+  imports: [CommonModule, TransactionListComponent, TransactionFormComponent, MatCardModule],
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,

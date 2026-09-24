@@ -1,1 +1,51 @@
-/* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+
+// ─── Material M3 Theme ───────────────────────────────────────────────────────
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$blue-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+// ─── Global Resets ───────────────────────────────────────────────────────────
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  color-scheme: light;
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+}
+
+// ─── Layout Utilities ────────────────────────────────────────────────────────
+
+// Constrains content width on xl screens and centres it
+.page-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+
+  @media (min-width: 600px) {
+    padding: 1.5rem 1.5rem;
+  }
+
+  @media (min-width: 960px) {
+    padding: 2rem 2rem;
+  }
+}
+
+// Full-width mat-form-field helper
+.full-width {
+  width: 100%;
+}
+

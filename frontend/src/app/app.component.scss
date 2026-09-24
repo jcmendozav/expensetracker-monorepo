@@ -1,0 +1,109 @@
+// ─── App Shell Layout ──────────────────────────────────────────────────────
+
+.app-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+// ─── Sidenav ───────────────────────────────────────────────────────────────
+
+.app-sidenav {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--mat-sys-outline-variant);
+}
+
+.sidenav-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 1.25rem 1rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface);
+}
+
+.brand-logo {
+  font-size: 1.5rem;
+}
+
+// Footer pushed to the bottom of the sidenav
+.sidenav-footer {
+  margin-top: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0.5rem 0;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--mat-sys-outline-variant);
+}
+
+.avatar-icon {
+  font-size: 36px;
+  width: 36px;
+  height: 36px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.user-name {
+  font-size: 0.85rem;
+  color: var(--mat-sys-on-surface-variant);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-logout {
+  width: 100%;
+}
+
+// ─── Toolbar ───────────────────────────────────────────────────────────────
+
+.app-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.toolbar-title {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.toolbar-spacer {
+  flex: 1;
+}
+
+.toolbar-user {
+  font-size: 0.85rem;
+  opacity: 0.9;
+
+  // Only show in toolbar on larger screens (sidenav footer handles it on mobile)
+  @media (max-width: 959px) {
+    display: none;
+  }
+}
+
+// ─── Main Content ──────────────────────────────────────────────────────────
+
+.main-content {
+  flex: 1;
+  overflow: auto;
+}
