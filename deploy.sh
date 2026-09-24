@@ -26,6 +26,7 @@ deploy_backend() {
         --source backend \
         --region "${REGION}" \
         --project "${PROJECT_ID}" \
+        --set-env-vars GOOGLE_CLOUD_PROJECT="${PROJECT_ID}" \
         --allow-unauthenticated \
         --memory 512Mi \
         --cpu 1 \
