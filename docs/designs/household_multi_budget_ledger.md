@@ -1,12 +1,12 @@
-# Design Document: Household Multi-Budget Envelope Ledger & In-App Activity Center
+# Design Document: Household Multi-Budget Ledger & In-App Activity Center
 
 ## 1. Executive Summary & Problem Context
-This design document formalizes the transformation of the Expense Tracker into a **Household-Centric Multi-Budget Envelope Ledger & In-App Activity Center**.
+This design document formalizes the transformation of the Expense Tracker into a **Household-Centric Multi-Budget Ledger & In-App Activity Center**.
 
 ### Core Objectives:
-1. **Household Shared Liquidity:** Provide joint visibility for partners/spouses into consolidated remaining liquidity across all shared budget envelopes.
+1. **Household Shared Liquidity:** Provide joint visibility for partners/spouses into consolidated remaining liquidity across all shared budgets.
 2. **Sub-3-Tap Mobile Expense Entry:** Deliver a low-friction entry modal leveraging native mobile numeric keypads and smart defaults.
-3. **Envelope Lifecycle & Rebalancing:** Support finite envelope balances (`PLANNED`, `ACTIVE`, `LOW_BALANCE`, `DEPLETED`, `ARCHIVED`) and 1-step inter-envelope fund transfers.
+3. **Budget Lifecycle & Rebalancing:** Support finite budget balances (`PLANNED`, `ACTIVE`, `LOW_BALANCE`, `DEPLETED`, `ARCHIVED`) and 1-step inter-budget fund transfers.
 4. **Bounded In-App Activity Center:** Guarantee alert delivery via an in-app drawer backed by Cloud Firestore with automatic 90-day TTL document purging.
 5. **Immutable Financial Ledger:** Use integer minor currency units (`cents`) and snapshot balances (`balanceAfterCents`) to ensure zero-drift audit trails.
 
@@ -15,6 +15,8 @@ This design document formalizes the transformation of the Expense Tracker into a
 ## 2. Multi-Tier Entity Lifecycles
 
 ### 2.1 Household Lifecycle
+A **Household** is the primary multi-tenant container representing a shared financial space (e.g., *"Mendoza Family"*).
+
 ```mermaid
 stateDiagram-v2
     [*] --> ONBOARDING: User signs up & creates Household
@@ -25,10 +27,12 @@ stateDiagram-v2
     ARCHIVED --> [*]
 ```
 
-### 2.2 Budget Envelope Lifecycle
+### 2.2 Budget Lifecycle
+A **Budget** is a dedicated virtual container of capital within the household.
+
 ```mermaid
 stateDiagram-v2
-    [*] --> PLANNED: Envelope created with target allocation
+    [*] --> PLANNED: Budget created with target allocation
     PLANNED --> ACTIVE: Initial funds allocated
     ACTIVE --> LOW_BALANCE: Balance drops below 10 percent
     LOW_BALANCE --> ACTIVE: Balance restored above 10 percent
@@ -41,6 +45,8 @@ stateDiagram-v2
 ```
 
 ### 2.3 Transaction Lifecycle
+Transactions are immutable financial events forming the append-only ledger.
+
 ```mermaid
 stateDiagram-v2
     [*] --> SUBMITTED: Transaction payload received
@@ -52,6 +58,7 @@ stateDiagram-v2
 ```
 
 ### 2.4 Co-Owner Invitation Lifecycle
+
 ```mermaid
 stateDiagram-v2
     [*] --> INVITED: Email invitation sent with secure token
@@ -64,6 +71,7 @@ stateDiagram-v2
 ```
 
 ### 2.5 Notification & Alert Lifecycle
+
 ```mermaid
 stateDiagram-v2
     [*] --> UNREAD: Event triggered and doc created
@@ -83,9 +91,9 @@ stateDiagram-v2
 | Action / Privilege | **PRIMARY OWNER (Creator)** | **CO-OWNER (Partner)** |
 | :--- | :---: | :---: |
 | **View Household Consolidated Liquidity** | ✅ | ✅ |
-| **Create / Edit / Archive Envelopes** | ✅ | ✅ |
+| **Create / Edit / Archive Budgets** | ✅ | ✅ |
 | **Log Expenses & Income Top-Ups** | ✅ | ✅ |
-| **Transfer Funds Between Envelopes** | ✅ | ✅ |
+| **Transfer Funds Between Budgets** | ✅ | ✅ |
 | **Invite & Manage Household Co-Owners** | ✅ | ✅ |
 | **Delete / Close the Entire Household** | ✅ | ❌ |
 
@@ -128,11 +136,11 @@ stateDiagram-v2
 │  ┌───────────────────────────────────────────────────┐  │
 │  │  S/. 14,200.00 PEN                                │  │
 │  │  $ 850.00 USD                                     │  │
-│  │  [ 4 Active Envelopes ]   [ 1 Low Balance Alert ] │  │
+│  │  [ 4 Active Budgets ]   [ 1 Low Balance Alert ]   │  │
 │  │  Members: You (Owner), Maria (Co-Owner)           │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
-│  ACTIVE ENVELOPES                                       │
+│  ACTIVE BUDGETS                                         │
 │                                                         │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │ 🍳 Kitchen Renovation               [CO-OWNER][PEN]│  │
@@ -161,15 +169,15 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 Budget Envelope Creation Flow (`/budgets/new` or Modal)
+### 4.3 Budget Creation Flow (`/budgets/new` or Modal)
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  ← Back to Envelopes              [ Create Envelope ]   │
+│  ← Back to Budgets                [ Create Budget ]     │
 ├─────────────────────────────────────────────────────────┤
-│  CREATE BUDGET ENVELOPE                                 │
+│  CREATE BUDGET                                          │
 │  Household: 🏡 Mendoza Family (Shared with Maria)       │
 │                                                         │
-│  Envelope Title:                                        │
+│  Budget Title:                                          │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │ Kitchen Renovation                                │  │
 │  └───────────────────────────────────────────────────┘  │
@@ -182,7 +190,7 @@ stateDiagram-v2
 │  Icon & Classification:                                 │
 │  [ 🍳 Home Repair ] [ 🛒 Food ] [ ✈️ Travel ] [ 🚗 Auto ]│
 │                                                         │
-│  [ CANCEL ]                    [ SAVE ENVELOPE ]        │
+│  [ CANCEL ]                    [ SAVE BUDGET ]          │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -192,7 +200,7 @@ stateDiagram-v2
 │                   === Drag Handle ===                   │
 │  LOG TRANSACTION                 [ Expense | + Top-up ] │
 │                                                         │
-│  Envelope:                                              │
+│  Budget:                                                │
 │  [ Kitchen Renovation (S/. 3,450 remaining)         ▾ ] │
 │                                                         │
 │  Amount:                                                │
@@ -208,19 +216,19 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.5 Inter-Envelope Transfer & Split Modal (`MatDialog`)
+### 4.5 Inter-Budget Transfer & Split Modal (`MatDialog`)
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  TRANSFER / SPLIT ENVELOPE FUNDS                        │
+│  TRANSFER / SPLIT BUDGET FUNDS                          │
 ├─────────────────────────────────────────────────────────┤
-│  Source Envelope:                                       │
+│  Source Budget:                                         │
 │  <strong>General Savings ($750.00 available)</strong>   │
 │                                                         │
 │  Destination Type:                                      │
-│  ( ) Transfer to Existing Envelope                      │
-│  (•) Spawn New Envelope from this Amount                │
+│  ( ) Transfer to Existing Budget                        │
+│  (•) Spawn New Budget from this Amount                  │
 │                                                         │
-│  New Envelope Name:                                     │
+│  New Budget Name:                                       │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │ Vacation Trip 2026                                │  │
 │  └───────────────────────────────────────────────────┘  │
@@ -260,10 +268,10 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.7 Envelope Details & Immutable Ledger History (`/budgets/:id`)
+### 4.7 Budget Details & Immutable Ledger History (`/budgets/:id`)
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  ← Back to Envelopes                    [⚙️ Settings]   │
+│  ← Back to Budgets                      [⚙️ Settings]   │
 ├─────────────────────────────────────────────────────────┤
 │  Kitchen Renovation                      [Active]       │
 │  Household: Mendoza Family • Co-Owner: Maria            │
@@ -306,7 +314,7 @@ Household (Collection: households/{householdId}):
 
 Budget (Collection: budgets/{budgetId}):
   id: string
-  householdId: string
+  householdId: string # Mandatory link to parent Household
   title: string
   initialAmountCents: long (e.g. 500000 for S/. 5,000.00)
   currentBalanceCents: long (e.g. 345000 for S/. 3,450.00)
@@ -357,8 +365,8 @@ Notification (Collection: notifications/{notificationId}):
 | :--- | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/households` | Create Household | `{ name: string, baseCurrencies: string[], partnerEmail?: string }` | `201 Created` $\to$ `HouseholdDto` |
 | `GET` | `/api/v1/households/current` | Get Active Household | *None* | `200 OK` $\to$ `HouseholdDto` |
-| `POST` | `/api/v1/budgets` | Create Budget Envelope | `{ householdId: string, title: string, initialAmountCents: long, currency: string }` | `201 Created` $\to$ `BudgetDto` |
-| `GET` | `/api/v1/budgets` | List Envelopes | *Query:* `?householdId=...&status=ACTIVE` | `200 OK` $\to$ `{ items: BudgetDto[], nextCursor: string }` |
+| `POST` | `/api/v1/budgets` | Create Budget | `{ householdId: string, title: string, initialAmountCents: long, currency: string }` | `201 Created` $\to$ `BudgetDto` |
+| `GET` | `/api/v1/budgets` | List Budgets | *Query:* `?householdId=...&status=ACTIVE` | `200 OK` $\to$ `{ items: BudgetDto[], nextCursor: string }` |
 | `GET` | `/api/v1/budgets/summary` | Consolidated Liquidity | *Query:* `?householdId=...` | `200 OK` $\to$ `{ balancesByCurrency: { [curr]: long }, activeCount: int }` |
 | `POST` | `/api/v1/budgets/{id}/transactions` | Log Expense / Top-Up | `{ type: "SPENDING"\|"INCOME", amountCents: long, category: string, note?: string, transactionDate: string }` | `201 Created` $\to$ `TransactionDto` |
 | `POST` | `/api/v1/budgets/transfers` | 1-Step Atomic Transfer | `{ sourceBudgetId: string, targetBudgetId: string, amountCents: long, note?: string }` | `200 OK` $\to$ `TransferResultDto` |
