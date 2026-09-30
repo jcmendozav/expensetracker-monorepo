@@ -4,7 +4,7 @@
 
 ## 1. Design & Architecture Principles
 
-- **Design Philosophy:** Adhere strictly to [docs/DESIGN_PHILOSOPHY.md](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/docs/DESIGN_PHILOSOPHY.md).
+- **Design Philosophy:** Adhere strictly to [docs/DESIGN_PHILOSOPHY.md](../docs/DESIGN_PHILOSOPHY.md).
   - Create **deep domain services** that encapsulate business rules and Firestore interactions.
   - Avoid shallow pass-through services or anemic data models.
   - Define errors out of existence: handle idempotent operations and boundary conditions gracefully.

@@ -1,6 +1,7 @@
 # Design Doc: Cloud Deployment & Public Access
 
 ## 1. Overview
+
 The goal of this design is to make the **Expense Tracker** application securely accessible over the internet for testing and usage with friends in Lima, Peru, with zero infrastructure maintenance and 100% free-tier compatibility.
 
 ---
@@ -16,7 +17,8 @@ flowchart TD
     CR -->|"Application Default Credentials (IAM)"| FS["Google Cloud Firestore"]
 ```
 
-### Components:
+### Components
+
 1. **Frontend (Angular SPA)**:
    - Hosted on **Firebase Hosting** (`https://expense-tracker-gcp-481004.web.app` or custom domain).
    - Global CDN delivery with automatic SSL/TLS.
@@ -36,13 +38,15 @@ flowchart TD
 
 ## 3. API Contract & CORS
 
-### Production Origins:
+### Production Origins
+
 - `https://expense-tracker-gcp-481004.web.app`
 - `https://expense-tracker-gcp-481004.firebaseapp.com`
 - `http://localhost:4200` (for local development)
 
-### Endpoints:
-- All paths start with `/api/v1/*` as per [AGENTS.md](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/AGENTS.md).
+### Endpoints
+
+- All paths start with `/api/v1/*` as per [AGENTS.md](../../AGENTS.md).
 - Secured with `Authorization: Bearer <firebase_id_token>`.
 
 ---
@@ -66,6 +70,7 @@ flowchart TD
 ---
 
 ## 5. Verification Plan
+
 1. Build and run backend container locally via Docker (optional test).
 2. Deploy backend to Cloud Run and verify public HTTPS endpoint.
 3. Build Angular frontend with production configuration and deploy to Firebase Hosting.

@@ -4,7 +4,7 @@
 
 ## 1. Design & Architecture Principles
 
-- **Design Philosophy:** Adhere strictly to [docs/DESIGN_PHILOSOPHY.md](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/docs/DESIGN_PHILOSOPHY.md).
+- **Design Philosophy:** Adhere strictly to [docs/DESIGN_PHILOSOPHY.md](../docs/DESIGN_PHILOSOPHY.md).
   - Create **deep stateful Angular services** that encapsulate HTTP communication, reactive state management, and data transformations.
   - Keep UI components **presentational (dumb)**—focused strictly on template rendering, user event emission, and view concerns.
 - **API Contracts:** TypeScript interfaces must strictly match the Spring Boot backend REST DTO contracts (defined in active design docs).

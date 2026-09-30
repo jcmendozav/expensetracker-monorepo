@@ -4,10 +4,10 @@
 
 ## 📖 Progressive Disclosure Links
 
-- **Design Philosophy & Complexity (APoSD):** [docs/DESIGN_PHILOSOPHY.md](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/docs/DESIGN_PHILOSOPHY.md)
-- **Backend Architecture & Guidelines (Spring Boot / Firestore):** [backend/AGENTS.md](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/backend/AGENTS.md)
-- **Frontend Architecture & Guidelines (Angular / Material 3):** [frontend/AGENTS.md](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/frontend/AGENTS.md)
-- **Active Feature Designs:** [docs/designs/](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/docs/designs/)
+- **Design Philosophy & Complexity (APoSD):** [docs/DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md)
+- **Backend Architecture & Guidelines (Spring Boot / Firestore):** [backend/AGENTS.md](backend/AGENTS.md)
+- **Frontend Architecture & Guidelines (Angular / Material 3):** [frontend/AGENTS.md](frontend/AGENTS.md)
+- **Active Feature Designs:** [docs/designs/](docs/designs/)
 
 ---
 
@@ -23,7 +23,7 @@
 ## 2. Core Project Invariants (Do Not Violate)
 
 - **Currency & Money:** ALWAYS store and transmit monetary values in integer minor units (`cents`, e.g., `$10.50` -> `1050`). NEVER use floating-point `double` or `float` for monetary amounts.
-- **Deep Modules:** Follow [docs/DESIGN_PHILOSOPHY.md](file:///Users/jampiermendoza/Projects/expensetracker-monorepo/docs/DESIGN_PHILOSOPHY.md)—build deep modules with simple public APIs, hide storage details, and define errors out of existence.
+- **Deep Modules:** Follow [docs/DESIGN_PHILOSOPHY.md](docs/DESIGN_PHILOSOPHY.md)—build deep modules with simple public APIs, hide storage details, and define errors out of existence.
 - **API Standard:** All backend REST controller paths must start with `/api/v1/`.
 - **Authentication:** All `/api/v1/*` endpoints require a valid Firebase ID token in `Authorization: Bearer <token>`.
 - **Framework-Agnostic Designs:** Keep UI wireframes and domain specifications in design docs framework-agnostic.
