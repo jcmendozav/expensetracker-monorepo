@@ -4,11 +4,11 @@
 This design document formalizes the transformation of the Expense Tracker into a **Household-Centric Multi-Budget Ledger & In-App Activity Center**.
 
 ### Core Objectives:
-1. **Household Shared Liquidity:** Provide joint visibility for partners/spouses into consolidated remaining liquidity across all shared budgets.
+1. **Household Shared Liquidity:** Provide joint visibility for partners/spouses into consolidated remaining liquidity across all shared budgets with cached snapshots.
 2. **Sub-3-Tap Mobile Expense Entry:** Deliver a low-friction entry modal leveraging native mobile numeric keypads and smart defaults.
-3. **Budget Lifecycle & Rebalancing:** Support finite budget balances (`PLANNED`, `ACTIVE`, `LOW_BALANCE`, `DEPLETED`, `ARCHIVED`) and 1-step inter-budget fund transfers.
-4. **Bounded In-App Activity Center:** Guarantee alert delivery via an in-app drawer backed by Cloud Firestore with automatic 90-day TTL document purging.
-5. **Immutable Financial Ledger:** Use integer minor currency units (`cents`) and snapshot balances (`balanceAfterCents`) to ensure zero-drift audit trails.
+3. **Budget Lifecycle & Rebalancing:** Support finite budget balances (`PLANNED`, `ACTIVE`, `LOW_BALANCE`, `DEPLETED`, `ARCHIVED`) and 1-step inter-budget fund transfers with manual FX support.
+4. **Bounded In-App Activity Center:** Guarantee non-blocking alert delivery decoupled via Spring Application Events and backed by Cloud Firestore 90-day TTL.
+5. **Immutable Financial Ledger:** Use integer minor currency units (`cents`), hybrid metadata edits, soft-voiding, and snapshot balances (`balanceAfterCents`) to ensure zero-drift audit trails.
 
 ---
 
@@ -52,8 +52,8 @@ stateDiagram-v2
     [*] --> SUBMITTED: Transaction payload received
     SUBMITTED --> COMMITTED: Atomic balance deduction committed
     SUBMITTED --> REJECTED: Insufficient funds or invalid role
-    COMMITTED --> VOIDED: Undo or deletion requested by Owner
-    VOIDED --> [*]: Balance atomically refunded
+    COMMITTED --> VOIDED: Soft-void requested by Owner (balance refunded)
+    VOIDED --> [*]: Preserved in ledger as VOIDED
     COMMITTED --> [*]
 ```
 
@@ -75,10 +75,7 @@ stateDiagram-v2
 ```mermaid
 stateDiagram-v2
     [*] --> UNREAD: Event triggered and doc created
-    UNREAD --> PINNED: User pins high-priority alert
-    PINNED --> UNREAD: User unpins alert
     UNREAD --> READ: User clicks or marks read
-    PINNED --> READ: Marked read while pinned
     READ --> ARCHIVED: Hidden from active feed after 7 days
     ARCHIVED --> PURGED: Cloud Firestore 90-day TTL engine deletes doc
     PURGED --> [*]
@@ -86,22 +83,96 @@ stateDiagram-v2
 
 ---
 
-## 3. RBAC Permission Matrix (Co-Ownership Model)
+## 3. Core Architectural Decisions (Red Flag Resolutions)
+
+### 3.1 Ledger Auditing & Mutation Strategy (Hybrid Model)
+* **Non-Financial Edits (`PATCH /transactions/{id}`):** Changes to `note`, `category`, and `receiptUrl` update the document in place without altering balances.
+* **Financial / Amount Corrections (`POST /transactions/{id}/void` & Re-issue):**
+  * To preserve mathematical ledger integrity, modifying amounts marks the original record as `status = VOIDED`, atomically refunds the amount to `budget.currentBalanceCents`, and appends a new corrected transaction with a fresh snapshot balance (`balanceAfterCents`).
+
+### 3.2 Cross-Currency Transfers with Manual Exchange Rates
+* Inter-budget transfers between different currencies are supported via an explicit `exchangeRate: double` parameter.
+* **Calculation:** `targetAmountCents = Math.round(sourceAmountCents * exchangeRate)`.
+* Both sides of the transfer record the applied `exchangeRate` in their metadata.
+
+### 3.3 Concurrency & Contention Policy
+* Uses Google Cloud Firestore's built-in **optimistic locking and automatic exponential retry** mechanism in `Firestore.runTransaction()`.
+* Fully supports simultaneous entries for household scale (<10 concurrent users).
+* *Technical Debt Note:* Sharded distributed counters are documented for future architecture if transaction frequency ever exceeds 1 write/second per budget.
+
+### 3.4 Data Archival & Soft-Deletion Standard
+* **Zero-Transaction Budgets:** Can be hard-deleted.
+* **Active Budgets with History:** Set to `status: "ARCHIVED"` (hidden from entry pickers, preserved in reports).
+* **Transactions:** Set to `status: "VOIDED"` (amount refunded, retained in ledger for auditability).
+
+### 3.5 Event-Driven Decoupled Notifications (Zero Transaction Contention)
+To ensure core monetary transactions remain lightning-fast (<100ms) and never fail due to auxiliary notification fan-out, we decouple notification generation using Spring `ApplicationEventPublisher`:
+
+```mermaid
+sequenceDiagram
+    participant Client as Angular Client
+    participant Controller as BudgetController
+    participant Service as LedgerService (Firestore Tx)
+    participant Publisher as ApplicationEventPublisher
+    participant Listener as NotificationEventListener (@Async)
+    participant Inbox as Firestore (notifications)
+
+    Client->>Controller: POST /api/v1/budgets/{id}/transactions
+    Controller->>Service: commitTransaction(dto)
+    Service->>Service: Atomic commit (Budget + Transaction)
+    Service->>Publisher: publish(BudgetBalanceChangedEvent)
+    Service-->>Controller: Return TransactionDto (201 Created)
+    Controller-->>Client: HTTP 201 Created (Instant UI Response)
+    
+    Note over Publisher,Listener: Non-blocking Async Dispatch
+    Publisher->>Listener: handleEvent(event)
+    Listener->>Inbox: Batch write notification docs (actor excluded)
+```
+
+### 3.6 Pre-Calculated Household Liquidity Snapshot
+* The `Household` entity maintains `balancesByCurrency: Map<String, Long>` directly on its document.
+* When any budget balance changes inside an atomic transaction, the parent household's currency balance map is updated in the same atomic commit.
+* **Benefit:** `GET /api/v1/budgets/summary` reads exactly **1 document** instead of querying all $N$ budgets, reducing Firestore read costs by up to $90\%$.
+
+---
+
+## 4. RBAC Permission Matrix (Co-Ownership Model)
 
 | Action / Privilege | **PRIMARY OWNER (Creator)** | **CO-OWNER (Partner)** |
 | :--- | :---: | :---: |
 | **View Household Consolidated Liquidity** | ✅ | ✅ |
 | **Create / Edit / Archive Budgets** | ✅ | ✅ |
 | **Log Expenses & Income Top-Ups** | ✅ | ✅ |
-| **Transfer Funds Between Budgets** | ✅ | ✅ |
+| **Edit Metadata / Void Own Transactions** | ✅ | ✅ |
+| **Transfer Funds Between Budgets (with FX)**| ✅ | ✅ |
 | **Invite & Manage Household Co-Owners** | ✅ | ✅ |
 | **Delete / Close the Entire Household** | ✅ | ❌ |
 
 ---
 
-## 4. Visual Wireframes Catalog
+## 5. Visual Wireframes & UI Routing Catalog
 
-### 4.1 Household Creation Flow (`/households/new`)
+### Frontend Navigation Architecture
+
+> [!NOTE]
+> The wireframes below are framework-agnostic. In the Angular frontend layer, they are implemented using standard **Angular Material 3** components (`@angular/material`).
+
+| Modality | UI Pattern | Route / Trigger | Angular Material 3 Component | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| **Dedicated Route** | Full Page | `/dashboard` | `DashboardComponent` (`MatCard`, `MatProgressBar`) | Main Household overview & active budgets |
+| **Dedicated Route** | Full Page | `/households/new` | `HouseholdCreateComponent` (`MatFormField`, `MatInput`) | Onboarding & initial setup |
+| **Dedicated Route** | Full Page | `/settings/household` | `HouseholdSettingsComponent` (`MatList`, `MatButton`) | Co-owner management, currencies & danger zone |
+| **Dedicated Route** | Full Page | `/budgets/new` | `BudgetCreateComponent` (`MatSelect`, `MatInput`) | Full budget creation form |
+| **Dedicated Route** | Full Page | `/budgets/:id` | `BudgetDetailComponent` (`MatTable`, `MatChips`) | Ledger history & transaction table |
+| **Dedicated Route** | Full Page | `/budgets/:id/settings` | `BudgetSettingsComponent` (`MatButton`, `MatDialog`) | Budget target adjustment, status & danger zone |
+| **Contextual Overlay**| Slide-Up Sheet | *Triggered via FAB `+`* | `MatBottomSheet` | Fast sub-3-tap mobile expense logging |
+| **Contextual Overlay**| Slide-Up Sheet | *Triggered via ledger row*| `MatBottomSheet` | Transaction details, note editing & soft-void |
+| **Contextual Overlay**| Modal Dialog | *Triggered via Transfer* | `MatDialog` | Inter-budget fund transfers with live FX |
+| **Contextual Overlay**| Side Drawer | *Triggered via Bell Icon* | `MatSidenav` | Bounded activity & notification drawer |
+
+---
+
+### 5.1 Household Creation Flow (`/households/new`)
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  [Logo] ExpenseTracker                     [ Step 1/2 ] │
@@ -127,7 +198,41 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.2 Household Dashboard (`/dashboard`)
+---
+
+### 5.2 Household Settings & Edit Page (`/settings/household`)
+```text
+┌─────────────────────────────────────────────────────────┐
+│  ← Back to Dashboard             [ Household Settings ] │
+├─────────────────────────────────────────────────────────┤
+│  EDIT HOUSEHOLD DETAILS                                 │
+│                                                         │
+│  Household Name:                                        │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ Mendoza Family                                    │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Base Currencies:                                       │
+│  [ ☑ PEN (Peruvian Sol) ]     [ ☑ USD (US Dollar) ]     │
+│  [ ☐ EUR (Euro) ]             [ ☐ COP (Colombian Peso) ]│
+│                                                         │
+│  Household Co-Owners:                                   │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ 👤 Carlos (You)                 [ Primary Owner ] │  │
+│  │ 👤 Maria (maria@example.com)    [ Co-Owner ] [✕]  │  │
+│  │ [ + Invite Another Co-Owner ]                     │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Danger Zone:                                           │
+│  [ Archive Household ]         [ Delete Household ]     │
+│                                                         │
+│  [ CANCEL ]                    [ SAVE CHANGES ]         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 5.3 Household Dashboard (`/dashboard`)
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  [Logo] ExpenseTracker   [🏡 Mendoza Family ▾] [🔔 (3)]│
@@ -169,10 +274,12 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 Budget Creation Flow (`/budgets/new` or Modal)
+---
+
+### 5.4 Create Budget Page (`/budgets/new`)
 ```text
 ┌─────────────────────────────────────────────────────────┐
-│  ← Back to Budgets                [ Create Budget ]     │
+│  ← Back to Dashboard              [ Create Budget ]     │
 ├─────────────────────────────────────────────────────────┤
 │  CREATE BUDGET                                          │
 │  Household: 🏡 Mendoza Family (Shared with Maria)       │
@@ -194,7 +301,42 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.4 Sub-3-Tap Mobile Expense Entry Modal (Bottom Sheet)
+---
+
+### 5.5 Budget Settings & Edit Page (`/budgets/:id/settings`)
+```text
+┌─────────────────────────────────────────────────────────┐
+│  ← Back to Budget Details              [ Edit Budget ]  │
+├─────────────────────────────────────────────────────────┤
+│  EDIT BUDGET SETTINGS                                   │
+│                                                         │
+│  Budget Title:                                          │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ Kitchen Renovation & Appliances                   │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Adjust Total Capital Allocation:                       │
+│  ┌─────────────────────────────────┬─────────────────┐  │
+│  │ 6,000.00                        │ Currency: [PEN] │  │
+│  └─────────────────────────────────┴─────────────────┘  │
+│  <small>Current Remaining Balance: S/. 3,450.00</small> │
+│                                                         │
+│  Icon & Classification:                                 │
+│  [ 🍳 Home Repair (Selected) ] [ 🛒 Food ] [ ✈️ Travel ]│
+│                                                         │
+│  Lifecycle Status:                                      │
+│  Status: [ ACTIVE ▾ ] (Options: ACTIVE, ARCHIVED)       │
+│                                                         │
+│  Danger Zone:                                           │
+│  [ 🗑️ Archive Budget & Hide from Active View ]         │
+│                                                         │
+│  [ CANCEL ]                    [ SAVE CHANGES ]         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 5.6 Sub-3-Tap Mobile Expense Entry Modal (Bottom Sheet)
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │                   === Drag Handle ===                   │
@@ -216,50 +358,84 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.5 Inter-Budget Transfer & Split Modal (`MatDialog`)
+---
+
+### 5.7 Transaction Edit / Delete Modal (Slide-Up Sheet)
+```text
+┌─────────────────────────────────────────────────────────┐
+│                   === Drag Handle ===                   │
+│  EDIT TRANSACTION                                       │
+│  Budget: Kitchen Renovation                             │
+│                                                         │
+│  Amount:                                                │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ S/. 250.00                                        │  │ (Directly editable)
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Date:     [ 25 Sep 2026                           📅 ] │
+│  Category: [ Plumbing Materials                     ▾ ] │
+│  Note:     [ PVC pipes and waterproof sealant         ] │
+│                                                         │
+│  [ 🗑️ Delete Transaction ]                              │
+│                                                         │
+│  [ CANCEL ]                    [ SAVE CHANGES ]         │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 5.8 Inter-Budget Transfer & Split Modal with FX
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  TRANSFER / SPLIT BUDGET FUNDS                          │
 ├─────────────────────────────────────────────────────────┤
 │  Source Budget:                                         │
-│  <strong>General Savings ($750.00 available)</strong>   │
+│  General Savings ($750.00 USD available)                │
 │                                                         │
-│  Destination Type:                                      │
-│  ( ) Transfer to Existing Budget                        │
-│  (•) Spawn New Budget from this Amount                  │
-│                                                         │
-│  New Budget Name:                                       │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ Vacation Trip 2026                                │  │
-│  └───────────────────────────────────────────────────┘  │
+│  Destination Budget:                                    │
+│  [ Groceries & Market (PEN)                         ▾ ] │
 │                                                         │
 │  Transfer Amount:                                       │
 │  ┌───────────────────────────────────────────────────┐  │
-│  │ $ 300.00                                          │  │
+│  │ $ 100.00 USD                                      │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  Exchange Rate (USD → PEN):                             │
+│  ┌─────────────────────────────────┬─────────────────┐  │
+│  │ 1 USD = [ 3.75 ] PEN            │ S/. 375.00 PEN  │  │
+│  └─────────────────────────────────┴─────────────────┘  │
+│                                                         │
+│  Note (Optional):                                       │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ Converted USD savings for weekly groceries        │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
 │  [ CANCEL ]                    [ CONFIRM TRANSFER ]     │
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.6 In-App Activity & Notification Drawer
+---
+
+### 5.9 In-App Activity & Notification Drawer
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  Activity & Notifications              [Mark All Read]  │
 ├─────────────────────────────────────────────────────────┤
-│  📌 PINNED ALERTS (Max 5)                               │
-│  ┌───────────────────────────────────────────────────┐  │
-│  │ ⚠️ Low Balance: "Groceries & Market"   [ 📌 Unpin ]│
-│  │ Dropped to S/. 180.00 (9% remaining)   [ ✓ Read ] │  │
-│  └───────────────────────────────────────────────────┘  │
-│                                                         │
 │  🔴 RECENT ACTIVITY (Last 7 Days)                       │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │ 💸 Expense Logged                   • 10m ago     │  │
 │  │ Maria logged S/. 250.00 on "Kitchen Renovation"   │  │
 │  │ Balance: S/. 3,450.00                             │  │
-│  │                                        [ 📌 Pin ] │  │
-│  │                                        [ ✓ Read ] │  │
+│  │                                                   │  │
+│  │ [ ↗ View Budget (/budgets/bdg_123) ]   [ ✓ Read ] │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ ⚠️ Low Balance Alert                • 2h ago      │  │
+│  │ "Groceries & Market" dropped below 10%            │  │
+│  │ Balance: S/. 180.00 (9% remaining)                │  │
+│  │                                                   │  │
+│  │ [ ↗ View Budget (/budgets/bdg_456) ]   [ ✓ Read ] │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
 │  [ Load More Earlier Activity (Page 1 of 3) ▾ ]         │
@@ -268,7 +444,9 @@ stateDiagram-v2
 └─────────────────────────────────────────────────────────┘
 ```
 
-### 4.7 Budget Details & Immutable Ledger History (`/budgets/:id`)
+---
+
+### 5.10 Budget Details & Immutable Ledger History (`/budgets/:id`)
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  ← Back to Budgets                      [⚙️ Settings]   │
@@ -296,7 +474,7 @@ stateDiagram-v2
 
 ---
 
-## 5. Domain Entities & Storage Architecture
+## 6. Domain Entities & Storage Architecture
 
 ```yaml
 Household (Collection: households/{householdId}):
@@ -304,6 +482,7 @@ Household (Collection: households/{householdId}):
   name: string
   status: "ONBOARDING" | "ACTIVE" | "FROZEN" | "ARCHIVED"
   baseCurrencies: string[] # ["PEN", "USD"]
+  balancesByCurrency: Map<string, long> # Pre-calculated snapshot: { "PEN": 1420000, "USD": 85000 }
   ownerId: string # Primary Creator UID
   members:
     "usr_carlos_123": { role: "PRIMARY_OWNER", displayName: "Carlos", email: "carlos@example.com", status: "ACTIVE" }
@@ -330,12 +509,14 @@ Transaction (Collection: budgets/{budgetId}/transactions/{txId}):
   budgetId: string
   idempotencyKey: string
   type: "SPENDING" | "INCOME" | "ADJUSTMENT" | "TRANSFER_OUT" | "TRANSFER_IN"
+  status: "COMMITTED" | "VOIDED"
   amountCents: long
   balanceAfterCents: long
   category: string
   note: string (nullable)
   linkedBudgetId: string (nullable)
   transferGroupId: string (nullable)
+  exchangeRate: double (nullable, e.g. 3.75)
   transactionDate: Instant
   createdBy: string
   createdByName: string
@@ -352,33 +533,34 @@ Notification (Collection: notifications/{notificationId}):
   title: string
   message: string
   isRead: boolean
-  isPinned: boolean
   expiresAt: Instant (now + 90 days TTL)
   createdAt: Instant
 ```
 
 ---
 
-## 6. REST API Contracts (`/api/v1/...`)
+## 7. REST API Contracts (`/api/v1/...`)
 
 | Method | Path | Description | Request Body | Response Body |
 | :--- | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/households` | Create Household | `{ name: string, baseCurrencies: string[], partnerEmail?: string }` | `201 Created` $\to$ `HouseholdDto` |
 | `GET` | `/api/v1/households/current` | Get Active Household | *None* | `200 OK` $\to$ `HouseholdDto` |
+| `PATCH`| `/api/v1/households/{id}` | Update Household Settings | `{ name?: string, baseCurrencies?: string[] }` | `200 OK` $\to$ `HouseholdDto` |
 | `POST` | `/api/v1/budgets` | Create Budget | `{ householdId: string, title: string, initialAmountCents: long, currency: string }` | `201 Created` $\to$ `BudgetDto` |
 | `GET` | `/api/v1/budgets` | List Budgets | *Query:* `?householdId=...&status=ACTIVE` | `200 OK` $\to$ `{ items: BudgetDto[], nextCursor: string }` |
+| `PATCH`| `/api/v1/budgets/{id}` | Update Budget Settings | `{ title?: string, initialAmountCents?: long, status?: string }` | `200 OK` $\to$ `BudgetDto` |
 | `GET` | `/api/v1/budgets/summary` | Consolidated Liquidity | *Query:* `?householdId=...` | `200 OK` $\to$ `{ balancesByCurrency: { [curr]: long }, activeCount: int }` |
 | `POST` | `/api/v1/budgets/{id}/transactions` | Log Expense / Top-Up | `{ type: "SPENDING"\|"INCOME", amountCents: long, category: string, note?: string, transactionDate: string }` | `201 Created` $\to$ `TransactionDto` |
-| `POST` | `/api/v1/budgets/transfers` | 1-Step Atomic Transfer | `{ sourceBudgetId: string, targetBudgetId: string, amountCents: long, note?: string }` | `200 OK` $\to$ `TransferResultDto` |
-| `DELETE`| `/api/v1/budgets/{id}/transactions/{txId}` | Void / Refund Transaction | *None* | `200 OK` $\to$ `BudgetSummaryDto` |
+| `PATCH`| `/api/v1/budgets/{id}/transactions/{txId}`| Update Metadata (Note/Category)| `{ category?: string, note?: string }` | `200 OK` $\to$ `TransactionDto` |
+| `POST` | `/api/v1/budgets/{id}/transactions/{txId}/void`| Void & Refund Transaction | *None* | `200 OK` $\to$ `TransactionDto` |
+| `POST` | `/api/v1/budgets/transfers` | 1-Step Atomic Transfer (with optional FX) | `{ sourceBudgetId: string, targetBudgetId: string, sourceAmountCents: long, exchangeRate?: double, note?: string }` | `200 OK` $\to$ `TransferResultDto` |
 | `GET` | `/api/v1/notifications` | Paginated Activity Feed | *Query:* `?limit=20&cursor=...` | `200 OK` $\to$ `{ items: NotificationDto[], nextCursor: string }` |
 | `PATCH`| `/api/v1/notifications/{id}/read` | Mark Alert Read | *None* | `200 OK` $\to$ `{ id: string, isRead: true }` |
-| `PATCH`| `/api/v1/notifications/{id}/pin` | Toggle Pin State | `{ isPinned: boolean }` | `200 OK` $\to$ `NotificationDto` |
 | `POST` | `/api/v1/notifications/mark-all-read` | Mark All Read | *None* | `200 OK` $\to$ `{ updatedCount: int }` |
 
 ---
 
-## 7. Verification Protocol
+## 8. Verification Protocol
 
 ### Backend (`/backend`)
 ```bash
