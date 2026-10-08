@@ -1,6 +1,6 @@
 # Frontend Guidelines: Expense Tracker (`/frontend`)
 
-> Angular SPA & Angular Material 3 client application.
+> Angular SPA (v20+) & Angular Material 3 client application.
 
 ## 1. Design & Architecture Principles
 
@@ -12,15 +12,52 @@
 
 ---
 
-## 2. Invariants & Standards
+## 2. Modern Angular (v20+) Coding Standards (Official AI Guidelines)
 
-- **Monetary Values:** Amounts received from the API are in integer minor units (`cents`). Format them to localized currency strings purely at the presentation boundary via pipes or formatting helpers.
-- **Reactive State:** Manage state via RxJS (`BehaviorSubject`, `Observable`) or Angular Signals. Avoid mutable shared globals.
-- **Authentication:** All outgoing `/api/v1/` HTTP requests must be intercepted by the auth interceptor to attach the Firebase ID token in the `Authorization: Bearer <token>` header.
+### Component Authoring & Reactivity
+
+- **Signals First:** Use Angular Signals (`signal()`, `computed()`, `linkedSignal()`) for all component and service state.
+  - Use `input()` and `output()` functions instead of `@Input()` and `@Output()` decorators.
+  - Use `model()` for two-way bindings with `[(prop)]` syntax.
+  - Use `computed()` for derived state; never write manual side-effect getters.
+  - Do NOT use `mutate` on signals; use `set()` or `update()`.
+- **Standalone:** Standalone components are the default in Angular 20+. Do NOT specify `standalone: true` in decorators.
+- **Dependency Injection:** Always use the `inject(Service)` function instead of constructor parameter injection.
+- **Host Bindings:** Do NOT use `@HostBinding()` or `@HostListener()`. Specify host bindings inside the `host` property of the `@Component` metadata:
+
+  ```typescript
+  @Component({
+    selector: 'app-budget-card',
+    host: {
+      '[class.over-budget]': 'isOverBudget()',
+      '(click)': 'onCardClick()'
+    }
+  })
+  ```
+
+### Templates & Clean Imports
+
+- **Native Control Flow:** ALWAYS use native control flow (`@if`, `@for`, `@switch`). NEVER use legacy `*ngIf`, `*ngFor`, or `*ngSwitch`.
+  - Always provide `track` in `@for` (e.g. `@for (item of items(); track item.id)`).
+- **Bindings:** Use native `[class.name]="..."` and `[style.name]="..."` bindings. Do NOT use `[ngClass]` or `[ngStyle]`.
+- **Selective Imports:** Do NOT import `CommonModule`. Import only the specific directives or pipes needed in the component (e.g. `AsyncPipe`, `DatePipe`, `CurrencyPipe`, `NgOptimizedImage`).
+- **Static Images:** Use `NgOptimizedImage` for static images.
+
+### Forms & Accessibility
+
+- **Forms:** Use Reactive Forms (`FormBuilder`, `FormGroup`, `FormControl`) with type-safe controls.
+- **Accessibility (a11y):** Ensure all components meet WCAG AA standards, support keyboard navigation, include proper ARIA attributes, and maintain proper color contrast.
 
 ---
 
-## 3. Deterministic Verification Commands
+## 3. Financial Invariants & Authentication
+
+- **Monetary Minor Units:** Amounts from the REST API are in integer minor units (`cents`). Format into localized currency strings only at the presentation boundary (via pipes/formatting utilities).
+- **Authentication:** All outgoing `/api/v1/*` HTTP calls must include the Firebase ID token in `Authorization: Bearer <token>` via the HTTP interceptor.
+
+---
+
+## 4. Deterministic Verification Commands
 
 Execute from the `/frontend` directory:
 
