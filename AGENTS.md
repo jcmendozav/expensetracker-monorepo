@@ -27,6 +27,7 @@
 - **API Standard:** All backend REST controller paths must start with `/api/v1/`.
 - **Authentication:** All `/api/v1/*` endpoints require a valid Firebase ID token in `Authorization: Bearer <token>`.
 - **Framework-Agnostic Designs:** Keep UI wireframes and domain specifications in design docs framework-agnostic.
+- **Documentation & Terminology:** Adhere to the [Google Developer Documentation Style Guide Word List](https://developers.google.com/style/word-list) across all design docs, UI microcopy, and error messages (e.g. use "sign in" not "login", "select" not "click", "set up" vs "setup").
 
 ---
 
