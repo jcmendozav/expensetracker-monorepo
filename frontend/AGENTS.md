@@ -80,6 +80,7 @@ Adhere strictly to high-reliability TypeScript and ESLint standards:
 - **Zero `any` (`no-explicit-any`):** The `any` type is **strictly banned**.
   - Use `unknown` for uncertain inputs/boundaries and narrow with type guards (`instanceof`, `typeof`).
   - Catch clauses must always use `catch (err: unknown)`:
+
     ```typescript
     try {
       await this.budgetService.createBudget(payload);
@@ -89,6 +90,7 @@ Adhere strictly to high-reliability TypeScript and ESLint standards:
       }
     }
     ```
+
 - **No Floating Promises (`no-floating-promises`):**
   - All Promises must be `await`ed, attached to a `.catch()`, or explicitly marked `void` (e.g. `void this.router.navigate(['/']);`).
   - Never allow asynchronous calls to float unhandled, risking silent background failures.
@@ -97,10 +99,12 @@ Adhere strictly to high-reliability TypeScript and ESLint standards:
   - In monetary contexts, `0` cents is a valid amount; `||` treats `0` as falsy and corrupts amounts to the fallback.
 - **Immutability of Injected Dependencies (`prefer-readonly`):**
   - Mark all private service injections and read-only signal fields as `readonly`:
+
     ```typescript
     private readonly budgetService = inject(BudgetService);
     readonly budgets = this.budgetService.budgets;
     ```
+
 - **Consistent Type Imports (`consistent-type-imports`):**
   - Use `import type { Budget } from '...'` for type-only imports to optimize bundler tree-shaking and avoid circular runtime dependencies.
 
