@@ -50,14 +50,37 @@
 
 ---
 
-## 3. Financial Invariants & Authentication
+## 3. Unidirectional Data Flow & Change Detection Safety
+
+To permanently eliminate `ExpressionChangedAfterItHasBeenCheckedError`, infinite Change Detection loops, data-view inconsistencies, and hard-to-debug side effects:
+
+- **Data Down, Events Up:**
+  - Data flows downward strictly via `input()` signals and read-only service observables/signals.
+  - Events and user intents flow upward strictly via `output()` events or explicit service method invocations (`service.update(...)`).
+  - Child components must **NEVER directly mutate parent or ancestor state**.
+- **Pure Render Expressions & `computed()`:**
+  - Template bindings and `computed()` signals must remain **100% pure and side-effect free**.
+  - NEVER trigger HTTP requests, route navigation, or signal mutations inside a template expression, getter, or `computed()`.
+- **Zero View-Phase State Mutations:**
+  - NEVER modify component or parent state inside `ngAfterViewInit`, `ngAfterViewChecked`, `ngAfterContentInit`, or `ngAfterContentChecked`.
+  - Initialize state and subscriptions in `ngOnInit` or constructor signal initializers.
+- **Signal Mutation Integrity:**
+  - Do NOT use `effect()` to synchronize state between signals (use `computed()` or `linkedSignal()`).
+  - Keep `effect()` strictly for external I/O (logging, analytics, third-party non-Angular DOM plugins).
+  - Use immutable updates: `signal.update(list => [...list, newItem])`.
+- **Zero Tolerance for Band-Aid CD Hacks:**
+  - NEVER use `setTimeout(() => ...)` or `ChangeDetectorRef.detectChanges()` to bypass `ExpressionChangedAfterItHasBeenCheckedError`. If the error occurs, correct the directional flow of data at the architectural source.
+
+---
+
+## 4. Financial Invariants & Authentication
 
 - **Monetary Minor Units:** Amounts from the REST API are in integer minor units (`cents`). Format into localized currency strings only at the presentation boundary (via pipes/formatting utilities).
 - **Authentication:** All outgoing `/api/v1/*` HTTP calls must include the Firebase ID token in `Authorization: Bearer <token>` via the HTTP interceptor.
 
 ---
 
-## 4. Deterministic Verification Commands
+## 5. Deterministic Verification Commands
 
 Execute from the `/frontend` directory:
 
