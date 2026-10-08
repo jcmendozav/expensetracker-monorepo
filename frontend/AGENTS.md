@@ -117,7 +117,27 @@ Adhere strictly to high-reliability TypeScript and ESLint standards:
 
 ---
 
-## 6. Deterministic Verification Commands
+## 6. Testing Standards & Clean Test Architecture
+
+### A. Unit & Component Test Organization (Low Cognitive Load)
+
+- **Colocation:** Always place `[name].spec.ts` directly next to `[name].component.ts` or `[name].service.ts`.
+- **BDD Hierarchy:** Organize test files with nested `describe('method/scenario')` blocks. Test names must read like behavioral specifications (`describe('transferFunds()')` $\rightarrow$ `describe('when currency differs')` $\rightarrow$ `it('should require exchangeRate')`).
+- **Test Data Factories:** Never duplicate 20-line mock objects inside test cases. Use centralized factories (`createMockBudget(...)`) with default values and partial overrides.
+- **AAA Pattern:** Visually separate each test into Arrange, Act, Assert sections. Never interleave actions and assertions.
+- **Angular CDK Harnesses:** Use `@angular/cdk/testing` and Material Component Harnesses (`MatButtonHarness`, `MatTableHarness`) for UI interactions instead of brittle CSS selectors (`By.css(...)`).
+- **Single Assertion:** Each `it()` block verifies **one single behavior or transition**, preventing multi-assertion cascading failure obscurity.
+
+### B. Visual Regression & Screenshot Testing (Playwright)
+
+- Capture baseline snapshots for critical Material 3 components across:
+  1. Default vs. Over-Budget / Alert states
+  2. Light Theme vs. Dark Theme (`colorScheme: 'dark'`)
+  3. Mobile (375px) vs. Desktop (1280px) viewports
+
+---
+
+## 7. Deterministic Verification Commands
 
 Execute from the `/frontend` directory:
 
