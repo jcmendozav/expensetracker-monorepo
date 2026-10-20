@@ -598,8 +598,9 @@ HouseholdInvitation (Collection: householdInvitations/{invitationId}):
 
 > [!IMPORTANT]
 > **API Standards & Security Invariants:**
-> - **Authentication:** All `/api/v1/*` endpoints require a valid Firebase ID token in `Authorization: Bearer <token>`. The authenticated caller's identity (`uid`, `email`) is extracted securely from the server-side security context; user IDs are never accepted from client-supplied request bodies.
-> - **Monetary Units:** All monetary amounts ending in `Cents` are strictly stored and transmitted in integer minor units (`long`). Floating-point `double` or `float` is prohibited for currency values.
+>
+> * **Authentication:** All `/api/v1/*` endpoints require a valid Firebase ID token in `Authorization: Bearer <token>`. The authenticated caller's identity (`uid`, `email`) is extracted securely from the server-side security context; user IDs are never accepted from client-supplied request bodies.
+> * **Monetary Units:** All monetary amounts ending in `Cents` are strictly stored and transmitted in integer minor units (`long`). Floating-point `double` or `float` is prohibited for currency values.
 
 | Method | Path | Description | Request Body | Response Body |
 | :--- | :--- | :--- | :--- | :--- |
