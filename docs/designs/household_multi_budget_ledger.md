@@ -1,9 +1,11 @@
 # Design Document: Household Multi-Budget Ledger & In-App Activity Center
 
 ## 1. Executive Summary & Problem Context
+
 This design document formalizes the transformation of the Expense Tracker into a **Household-Centric Multi-Budget Ledger & In-App Activity Center**.
 
-### Core Objectives:
+### Core Objectives
+
 1. **Household Shared Liquidity:** Provide joint visibility for partners/spouses into consolidated remaining liquidity across all shared budgets with cached snapshots.
 2. **Sub-3-Tap Mobile Expense Entry:** Deliver a low-friction entry modal leveraging native mobile numeric keypads and smart defaults.
 3. **Budget Lifecycle & Rebalancing:** Support finite budget balances (`PLANNED`, `ACTIVE`, `LOW_BALANCE`, `DEPLETED`, `ARCHIVED`) and 1-step inter-budget fund transfers with manual FX support.
@@ -15,6 +17,7 @@ This design document formalizes the transformation of the Expense Tracker into a
 ## 2. Multi-Tier Entity Lifecycles
 
 ### 2.1 Household Lifecycle
+
 A **Household** is the primary multi-tenant container representing a shared financial space (e.g., *"Mendoza Family"*).
 
 ```mermaid
@@ -28,6 +31,7 @@ stateDiagram-v2
 ```
 
 ### 2.2 Budget Lifecycle
+
 A **Budget** is a dedicated virtual container of capital within the household.
 
 ```mermaid
@@ -45,6 +49,7 @@ stateDiagram-v2
 ```
 
 ### 2.3 Transaction Lifecycle
+
 Transactions are immutable financial events forming the append-only ledger.
 
 ```mermaid
@@ -57,25 +62,36 @@ stateDiagram-v2
     COMMITTED --> [*]
 ```
 
-### 2.4 Co-Owner Invitation Lifecycle
+### 2.4 Co-Owner In-App Invitation Lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> INVITED: Email invitation sent with secure token
-    INVITED --> ACTIVE: Partner accepts invite via app
-    INVITED --> EXPIRED: 7 days without acceptance
+    [*] --> PENDING: Partner invited by email in Household Settings
+    PENDING --> ACCEPTED: Partner accepts via in-app notification or banner upon sign-in
+    PENDING --> DECLINED: Partner declines invitation
+    PENDING --> CANCELLED: Owner cancels invitation
+    ACCEPTED --> ACTIVE: Added to household members with CO_OWNER role
     ACTIVE --> SUSPENDED: Temporarily paused by Primary Owner
     SUSPENDED --> ACTIVE: Access resumed
-    ACTIVE --> REMOVED: Co-Owner removed
+    ACTIVE --> REMOVED: Co-Owner removed by Primary Owner
     REMOVED --> [*]
+    DECLINED --> [*]
+    CANCELLED --> [*]
 ```
+
+> **Design Decision (Zero External Email Dependencies):** Rather than integrating a third-party transactional email provider (such as SendGrid or Resend) and custom security tokens, invitations are managed directly in-app:
+>
+> 1. The Owner enters the partner's email address (`invitedEmail`).
+> 2. When the partner signs in with their Google account via Firebase Authentication, the app queries pending invitations matching their verified email.
+> 3. An actionable notification card appears in their In-App Activity & Notification Drawer and Dashboard banner to **Accept** or **Decline**.
+> 4. Accepting the invitation atomically updates the household membership. This approach leverages Firebase Auth's verified Google identities with zero infrastructure cost and zero third-party dependencies.
 
 ### 2.5 Notification & Alert Lifecycle
 
 ```mermaid
 stateDiagram-v2
     [*] --> UNREAD: Event triggered and doc created
-    UNREAD --> READ: User clicks or marks read
+    UNREAD --> READ: User selects or marks read
     READ --> ARCHIVED: Hidden from active feed after 7 days
     ARCHIVED --> PURGED: Cloud Firestore 90-day TTL engine deletes doc
     PURGED --> [*]
@@ -86,26 +102,31 @@ stateDiagram-v2
 ## 3. Core Architectural Decisions (Red Flag Resolutions)
 
 ### 3.1 Ledger Auditing & Mutation Strategy (Hybrid Model)
+
 * **Non-Financial Edits (`PATCH /transactions/{id}`):** Changes to `note`, `category`, and `receiptUrl` update the document in place without altering balances.
 * **Financial / Amount Corrections (`POST /transactions/{id}/void` & Re-issue):**
   * To preserve mathematical ledger integrity, modifying amounts marks the original record as `status = VOIDED`, atomically refunds the amount to `budget.currentBalanceCents`, and appends a new corrected transaction with a fresh snapshot balance (`balanceAfterCents`).
 
 ### 3.2 Cross-Currency Transfers with Manual Exchange Rates
+
 * Inter-budget transfers between different currencies are supported via an explicit `exchangeRate: double` parameter.
 * **Calculation:** `targetAmountCents = Math.round(sourceAmountCents * exchangeRate)`.
 * Both sides of the transfer record the applied `exchangeRate` in their metadata.
 
 ### 3.3 Concurrency & Contention Policy
+
 * Uses Google Cloud Firestore's built-in **optimistic locking and automatic exponential retry** mechanism in `Firestore.runTransaction()`.
 * Fully supports simultaneous entries for household scale (<10 concurrent users).
 * *Technical Debt Note:* Sharded distributed counters are documented for future architecture if transaction frequency ever exceeds 1 write/second per budget.
 
 ### 3.4 Data Archival & Soft-Deletion Standard
+
 * **Zero-Transaction Budgets:** Can be hard-deleted.
 * **Active Budgets with History:** Set to `status: "ARCHIVED"` (hidden from entry pickers, preserved in reports).
 * **Transactions:** Set to `status: "VOIDED"` (amount refunded, retained in ledger for auditability).
 
 ### 3.5 Event-Driven Decoupled Notifications (Zero Transaction Contention)
+
 To ensure core monetary transactions remain lightning-fast (<100ms) and never fail due to auxiliary notification fan-out, we decouple notification generation using Spring `ApplicationEventPublisher`:
 
 ```mermaid
@@ -130,6 +151,7 @@ sequenceDiagram
 ```
 
 ### 3.6 Pre-Calculated Household Liquidity Snapshot
+
 * The `Household` entity maintains `balancesByCurrency: Map<String, Long>` directly on its document.
 * When any budget balance changes inside an atomic transaction, the parent household's currency balance map is updated in the same atomic commit.
 * **Benefit:** `GET /api/v1/budgets/summary` reads exactly **1 document** instead of querying all $N$ budgets, reducing Firestore read costs by up to $90\%$.
@@ -144,7 +166,7 @@ sequenceDiagram
 | **Create / Edit / Archive Budgets** | ✅ | ✅ |
 | **Log Expenses & Income Top-Ups** | ✅ | ✅ |
 | **Edit Metadata / Void Own Transactions** | ✅ | ✅ |
-| **Transfer Funds Between Budgets (with FX)**| ✅ | ✅ |
+| **Transfer Funds Between Budgets (with FX)** | ✅ | ✅ |
 | **Invite & Manage Household Co-Owners** | ✅ | ✅ |
 | **Delete / Close the Entire Household** | ✅ | ❌ |
 
@@ -165,14 +187,15 @@ sequenceDiagram
 | **Dedicated Route** | Full Page | `/budgets/new` | `BudgetCreateComponent` (`MatSelect`, `MatInput`) | Full budget creation form |
 | **Dedicated Route** | Full Page | `/budgets/:id` | `BudgetDetailComponent` (`MatTable`, `MatChips`) | Ledger history & transaction table |
 | **Dedicated Route** | Full Page | `/budgets/:id/settings` | `BudgetSettingsComponent` (`MatButton`, `MatDialog`) | Budget target adjustment, status & danger zone |
-| **Contextual Overlay**| Slide-Up Sheet | *Triggered via FAB `+`* | `MatBottomSheet` | Fast sub-3-tap mobile expense logging |
-| **Contextual Overlay**| Slide-Up Sheet | *Triggered via ledger row*| `MatBottomSheet` | Transaction details, note editing & soft-void |
-| **Contextual Overlay**| Modal Dialog | *Triggered via Transfer* | `MatDialog` | Inter-budget fund transfers with live FX |
-| **Contextual Overlay**| Side Drawer | *Triggered via Bell Icon* | `MatSidenav` | Bounded activity & notification drawer |
+| **Contextual Overlay** | Slide-Up Sheet | *Triggered via FAB `+`* | `MatBottomSheet` | Fast sub-3-tap mobile expense logging |
+| **Contextual Overlay** | Slide-Up Sheet | *Triggered via ledger row* | `MatBottomSheet` | Transaction details, note editing & soft-void |
+| **Contextual Overlay** | Modal Dialog | *Triggered via Transfer* | `MatDialog` | Inter-budget fund transfers with live FX |
+| **Contextual Overlay** | Side Drawer | *Triggered via Bell Icon* | `MatSidenav` | Bounded activity & notification drawer |
 
 ---
 
 ### 5.1 Household Creation Flow (`/households/new`)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  [Logo] ExpenseTracker                     [ Step 1/2 ] │
@@ -191,7 +214,7 @@ sequenceDiagram
 │                                                         │
 │  Invite Partner as Co-Owner (Optional):                 │
 │  ┌───────────────────────────────────────────────────┐  │
-│  │ maria@example.com (Partner will receive invite)   │  │
+│  │ maria@example.com (Partner will see on sign-in)   │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
 │  [ CANCEL ]                    [ CREATE HOUSEHOLD → ]   │
@@ -201,6 +224,7 @@ sequenceDiagram
 ---
 
 ### 5.2 Household Settings & Edit Page (`/settings/household`)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  ← Back to Dashboard             [ Household Settings ] │
@@ -219,8 +243,9 @@ sequenceDiagram
 │  Household Co-Owners:                                   │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │ 👤 Carlos (You)                 [ Primary Owner ] │  │
-│  │ 👤 Maria (maria@example.com)    [ Co-Owner ] [✕]  │  │
-│  │ [ + Invite Another Co-Owner ]                     │  │
+│  │ 👤 Maria (maria@example.com)    [ Pending Invite ]│  │
+│  │                                 [ Cancel Invite ] │  │
+│  │ [ + Invite Co-Owner by Email ]                    │  │
 │  └───────────────────────────────────────────────────┘  │
 │                                                         │
 │  Danger Zone:                                           │
@@ -233,6 +258,7 @@ sequenceDiagram
 ---
 
 ### 5.3 Household Dashboard (`/dashboard`)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  [Logo] ExpenseTracker   [🏡 Mendoza Family ▾] [🔔 (3)]│
@@ -277,6 +303,7 @@ sequenceDiagram
 ---
 
 ### 5.4 Create Budget Page (`/budgets/new`)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  ← Back to Dashboard              [ Create Budget ]     │
@@ -304,6 +331,7 @@ sequenceDiagram
 ---
 
 ### 5.5 Budget Settings & Edit Page (`/budgets/:id/settings`)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  ← Back to Budget Details              [ Edit Budget ]  │
@@ -337,6 +365,7 @@ sequenceDiagram
 ---
 
 ### 5.6 Sub-3-Tap Mobile Expense Entry Modal (Bottom Sheet)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │                   === Drag Handle ===                   │
@@ -361,6 +390,7 @@ sequenceDiagram
 ---
 
 ### 5.7 Transaction Edit / Delete Modal (Slide-Up Sheet)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │                   === Drag Handle ===                   │
@@ -385,6 +415,7 @@ sequenceDiagram
 ---
 
 ### 5.8 Inter-Budget Transfer & Split Modal with FX
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  TRANSFER / SPLIT BUDGET FUNDS                          │
@@ -417,10 +448,20 @@ sequenceDiagram
 ---
 
 ### 5.9 In-App Activity & Notification Drawer
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  Activity & Notifications              [Mark All Read]  │
 ├─────────────────────────────────────────────────────────┤
+│  📩 PENDING INVITATIONS                                 │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ 🏠 Household Invitation             • Just now    │  │
+│  │ Carlos invited you to join "Mendoza Family"       │  │
+│  │ Role: Co-Owner                                    │  │
+│  │                                                   │  │
+│  │         [ ✅ Accept ]      [ ❌ Decline ]          │  │
+│  └───────────────────────────────────────────────────┘  │
+│                                                         │
 │  🔴 RECENT ACTIVITY (Last 7 Days)                       │
 │  ┌───────────────────────────────────────────────────┐  │
 │  │ 💸 Expense Logged                   • 10m ago     │  │
@@ -447,6 +488,7 @@ sequenceDiagram
 ---
 
 ### 5.10 Budget Details & Immutable Ledger History (`/budgets/:id`)
+
 ```text
 ┌─────────────────────────────────────────────────────────┐
 │  ← Back to Budgets                      [⚙️ Settings]   │
@@ -527,14 +569,27 @@ Notification (Collection: notifications/{notificationId}):
   householdId: string
   recipientId: string
   actorId: string
-  budgetId: string
-  budgetTitle: string
-  type: "BUDGET_CREATED" | "BUDGET_DEPLETED" | "LOW_BALANCE_WARNING" | "EXPENSE_LOGGED" | "FUNDS_ADDED"
+  budgetId: string (nullable)
+  budgetTitle: string (nullable)
+  invitationId: string (nullable, for HOUSEHOLD_INVITATION type)
+  type: "HOUSEHOLD_INVITATION" | "BUDGET_CREATED" | "BUDGET_DEPLETED" | "LOW_BALANCE_WARNING" | "EXPENSE_LOGGED" | "FUNDS_ADDED"
   title: string
   message: string
   isRead: boolean
   expiresAt: Instant (now + 90 days TTL)
   createdAt: Instant
+
+HouseholdInvitation (Collection: householdInvitations/{invitationId}):
+  id: string
+  householdId: string
+  householdName: string
+  inviterId: string
+  inviterName: string
+  invitedEmail: string (case-normalized lowercase)
+  role: "CO_OWNER"
+  status: "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED"
+  createdAt: Instant
+  updatedAt: Instant
 ```
 
 ---
@@ -545,17 +600,22 @@ Notification (Collection: notifications/{notificationId}):
 | :--- | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/households` | Create Household | `{ name: string, baseCurrencies: string[], partnerEmail?: string }` | `201 Created` $\to$ `HouseholdDto` |
 | `GET` | `/api/v1/households/current` | Get Active Household | *None* | `200 OK` $\to$ `HouseholdDto` |
-| `PATCH`| `/api/v1/households/{id}` | Update Household Settings | `{ name?: string, baseCurrencies?: string[] }` | `200 OK` $\to$ `HouseholdDto` |
+| `PATCH` | `/api/v1/households/{id}` | Update Household Settings | `{ name?: string, baseCurrencies?: string[] }` | `200 OK` $\to$ `HouseholdDto` |
+| `POST` | `/api/v1/households/{id}/invitations` | Invite Co-Owner by Email | `{ invitedEmail: string }` | `201 Created` $\to$ `HouseholdInvitationDto` |
+| `GET` | `/api/v1/invitations/pending` | List Pending Invitations for Signed-In User | *None* | `200 OK` $\to$ `HouseholdInvitationDto[]` |
+| `POST` | `/api/v1/invitations/{id}/accept` | Accept Household Invitation | *None* | `200 OK` $\to$ `HouseholdDto` |
+| `POST` | `/api/v1/invitations/{id}/decline` | Decline Household Invitation | *None* | `200 OK` $\to$ `{ id: string, status: "DECLINED" }` |
+| `DELETE` | `/api/v1/households/{id}/invitations/{invitationId}` | Cancel Pending Invitation (Owner only) | *None* | `204 No Content` |
 | `POST` | `/api/v1/budgets` | Create Budget | `{ householdId: string, title: string, initialAmountCents: long, currency: string }` | `201 Created` $\to$ `BudgetDto` |
 | `GET` | `/api/v1/budgets` | List Budgets | *Query:* `?householdId=...&status=ACTIVE` | `200 OK` $\to$ `{ items: BudgetDto[], nextCursor: string }` |
-| `PATCH`| `/api/v1/budgets/{id}` | Update Budget Settings | `{ title?: string, initialAmountCents?: long, status?: string }` | `200 OK` $\to$ `BudgetDto` |
+| `PATCH` | `/api/v1/budgets/{id}` | Update Budget Settings | `{ title?: string, initialAmountCents?: long, status?: string }` | `200 OK` $\to$ `BudgetDto` |
 | `GET` | `/api/v1/budgets/summary` | Consolidated Liquidity | *Query:* `?householdId=...` | `200 OK` $\to$ `{ balancesByCurrency: { [curr]: long }, activeCount: int }` |
 | `POST` | `/api/v1/budgets/{id}/transactions` | Log Expense / Top-Up | `{ type: "SPENDING"\|"INCOME", amountCents: long, category: string, note?: string, transactionDate: string }` | `201 Created` $\to$ `TransactionDto` |
-| `PATCH`| `/api/v1/budgets/{id}/transactions/{txId}`| Update Metadata (Note/Category)| `{ category?: string, note?: string }` | `200 OK` $\to$ `TransactionDto` |
-| `POST` | `/api/v1/budgets/{id}/transactions/{txId}/void`| Void & Refund Transaction | *None* | `200 OK` $\to$ `TransactionDto` |
+| `PATCH` | `/api/v1/budgets/{id}/transactions/{txId}` | Update Metadata (Note/Category) | `{ category?: string, note?: string }` | `200 OK` $\to$ `TransactionDto` |
+| `POST` | `/api/v1/budgets/{id}/transactions/{txId}/void` | Void & Refund Transaction | *None* | `200 OK` $\to$ `TransactionDto` |
 | `POST` | `/api/v1/budgets/transfers` | 1-Step Atomic Transfer (with optional FX) | `{ sourceBudgetId: string, targetBudgetId: string, sourceAmountCents: long, exchangeRate?: double, note?: string }` | `200 OK` $\to$ `TransferResultDto` |
 | `GET` | `/api/v1/notifications` | Paginated Activity Feed | *Query:* `?limit=20&cursor=...` | `200 OK` $\to$ `{ items: NotificationDto[], nextCursor: string }` |
-| `PATCH`| `/api/v1/notifications/{id}/read` | Mark Alert Read | *None* | `200 OK` $\to$ `{ id: string, isRead: true }` |
+| `PATCH` | `/api/v1/notifications/{id}/read` | Mark Alert Read | *None* | `200 OK` $\to$ `{ id: string, isRead: true }` |
 | `POST` | `/api/v1/notifications/mark-all-read` | Mark All Read | *None* | `200 OK` $\to$ `{ updatedCount: int }` |
 
 ---
@@ -563,11 +623,13 @@ Notification (Collection: notifications/{notificationId}):
 ## 8. Verification Protocol
 
 ### Backend (`/backend`)
+
 ```bash
 cd backend && ./gradlew test
 ```
 
 ### Frontend (`/frontend`)
+
 ```bash
 cd frontend && npm test -- --watch=false --browsers=ChromeHeadless
 ```
