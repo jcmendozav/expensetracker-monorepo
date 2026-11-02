@@ -736,3 +736,93 @@ cd frontend && npm run build
 ```bash
 cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 ```
+
+---
+
+## 9. Phased Implementation & Token Safety Protocol
+
+> [!IMPORTANT]
+> **Token Exhaustion & Mid-Task Stall Prevention:**
+> To prevent truncated code generation, lost session state, or uncompilable intermediate builds, implementation must strictly adhere to the following execution invariants:
+>
+> 1. **One Deep Module Per Turn:** Never attempt to generate multiple services or whole subsystems in a single prompt or turn. Each turn is restricted to at most one module boundary (DTOs + Service/Controller + Tests).
+> 2. **Clean Build Checkpoint Invariant:** Every phase and sub-task must conclude with a passing build check (`./gradlew test` or `./gradlew build -x test`). Never proceed to the next task if the current code fails compilation.
+> 3. **Persistent Resumability:** The progress checklist below serves as the single source of truth for execution state. If a session runs out of tokens, a new session can read this matrix and resume the exact unfinished task without re-analyzing past conversational history.
+
+### 9.1 Phased Execution Roadmap
+
+```
+  Phase 1: Household Core & Security Context
+      │
+      ▼
+  Phase 2: Budget Domain, State Machine & Liquidity
+      │
+      ▼
+  Phase 3: Transactions, Atomic Ledger & Voiding
+      │
+      ▼
+  Phase 4: In-App Household Invitations & Onboarding
+      │
+      ▼
+  Phase 5: Decoupled Alerts & Activity Feed (Events + TTL)
+      │
+      ▼
+  Phase 6: Frontend Angular UI Integration (Routing & Sheets)
+      │
+      ▼
+  Phase 7: End-to-End Verification & Design Doc Archival
+```
+
+---
+
+### 9.2 Progress & Checkpoint Matrix
+
+#### Phase 1: Household Core & Security Context
+
+* [ ] **1.1 Household DTOs & Validation:** Define `CreateHouseholdRequest`, `UpdateHouseholdRequest`, and `HouseholdDto` with Jakarta Bean Validation.
+* [ ] **1.2 Household Service & Storage:** Implement `HouseholdService` with Firestore collection `households`, enforcing single active household lookup and multi-currency arrays.
+* [ ] **1.3 Household Controller & Security Slice:** Implement `/api/v1/households` endpoints extracting caller UID from `Principal.getName()`. Add `@WebMvcTest` slice verifying 201/200/400/401/403 responses.
+* [ ] **1.4 Phase 1 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+
+#### Phase 2: Budget Domain, State Machine & Liquidity
+
+* [ ] **2.1 Budget DTOs & Lifecycle Domain Logic:** Implement `BudgetDto`, `CreateBudgetRequest`, integer cents math, and unit tests for status derivation (`ACTIVE` $\to$ `LOW_BALANCE` < 10% $\to$ `DEPLETED` == 0).
+* [ ] **2.2 Budget Service & Firestore Integration:** Implement `BudgetService` managing `budgets/{budgetId}` with cached remaining balance snapshots.
+* [ ] **2.3 Budget Controller & Liquidity Summary:** Implement `/api/v1/budgets` and `/api/v1/budgets/summary` endpoints with `@WebMvcTest` slices.
+* [ ] **2.4 Phase 2 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+
+#### Phase 3: Transactions, Atomic Ledger & Transfers
+
+* [ ] **3.1 Transaction DTOs & Invariants:** Define `LogTransactionRequest`, `TransactionDto`, `TransferRequest`, and `TransferResultDto` strictly using `long amountCents`.
+* [ ] **3.2 Transaction Service & Atomic Mutations:** Implement atomic multi-document operations in `TransactionService` (inter-budget transfers, soft-void refunds with `isVoided = true`, snapshotting `balanceAfterCents`).
+* [ ] **3.3 Transaction Controller & Slice Tests:** Implement `/api/v1/budgets/{id}/transactions` and `/api/v1/budgets/transfers`. Verify with `@WebMvcTest`.
+* [ ] **3.4 Phase 3 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+
+#### Phase 4: In-App Household Invitations
+
+* [ ] **4.1 Invitation DTOs & State Machine:** Define `InviteCoOwnerRequest`, `HouseholdInvitationDto`, and normalize emails to lowercase.
+* [ ] **4.2 Invitation Service & Member Mutation:** Implement invite creation, pending lookup by authenticated email, atomic accept (updating household `memberUids`), and decline.
+* [ ] **4.3 Invitation Controller Endpoints:** Implement `/api/v1/households/{id}/invitations` and `/api/v1/invitations/...`. Add slice tests.
+* [ ] **4.4 Phase 4 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+
+#### Phase 5: Decoupled Activity Alerts & TTL
+
+* [ ] **5.1 Domain Events & Publisher:** Define `TransactionCreatedEvent`, `BudgetLowBalanceEvent`, and Spring `@EventListener` handlers.
+* [ ] **5.2 Notification Service & Storage:** Implement async notification write to `notifications/{id}` with 90-day TTL field.
+* [ ] **5.3 Notification Controller Endpoints:** Implement `/api/v1/notifications` (paginated feed, mark read, mark all read).
+* [ ] **5.4 Phase 5 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+
+#### Phase 6: Frontend Angular UI Integration
+
+* [ ] **6.1 Angular Services & Models:** Update TypeScript models (cents minor units) and REST API client services using `HttpClient`.
+* [ ] **6.2 Dashboard & Liquidity Cards:** Implement consolidated balance cards and multi-budget summaries in `/dashboard`.
+* [ ] **6.3 Sub-3-Tap Mobile Expense Entry:** Implement bottom sheet with native numeric keypad and budget selector.
+* [ ] **6.4 Inter-Budget Transfer Modal:** Implement transfer sheet with manual FX rate calculator.
+* [ ] **6.5 In-App Notification Drawer & Banners:** Implement pending invite alert banners and activity center feed.
+* [ ] **6.6 Phase 6 Checkpoint:** Run `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless` and `npm run build`.
+
+#### Phase 7: Full Monorepo Verification & Lifecycle Archival
+
+* [ ] **7.1 Full Monorepo Build Check:** Execute `cd backend && ./gradlew build -x test && cd ../frontend && npm run build`.
+* [ ] **7.2 Full Test Suite:** Execute all backend and frontend unit/integration test suites.
+* [ ] **7.3 Lifecycle Archival:** Move `household_multi_budget_ledger.md` to `docs/archive/` and update `README.md`.
