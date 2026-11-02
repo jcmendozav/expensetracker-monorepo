@@ -22,7 +22,25 @@
 
 ---
 
-## 3. Deterministic Verification Commands
+## 3. Test Strategy & Architecture
+
+All backend modules must follow a 4-tier testing pyramid grounded in [docs/DESIGN_PHILOSOPHY.md](../docs/DESIGN_PHILOSOPHY.md) (testing deep contracts, defining errors out of existence, and avoiding brittle mock chains of third-party SDKs):
+
+- **Layer 1: Pure Domain & Calculation Unit Tests (JUnit 5 + AssertJ)**
+  - Zero Spring context; fast, sub-second execution.
+  - Test pure business logic: monetary minor-unit calculations (`long cents`), currency rounding, domain entity state transitions, and soft-void/refund arithmetic.
+- **Layer 2: REST Controller Slice Tests (`@WebMvcTest`)**
+  - Use `MockMvc` with `@MockBean` service dependencies.
+  - Verify `/api/v1/...` routes, Jakarta Bean Validation (`@Valid`, `@NotNull`, `@Min`), HTTP response status codes (`201`, `200`, `400`, `403`), and DTO JSON serialization.
+- **Layer 3: Security & Filter Tests**
+  - Verify `FirebaseTokenFilter` and `SecurityConfig`: missing or expired tokens return `401 Unauthorized`, valid tokens properly populate `SecurityContextHolder` with the authenticated `uid`, and CORS headers are asserted.
+- **Layer 4: Deep Service & Firestore Concurrency Integration Tests**
+  - Run against the **Firebase Local Firestore Emulator** (`localhost:8085`).
+  - Test multi-document atomic batch operations, transaction rollbacks on failure, idempotency (e.g. repeated soft-voids), and non-blocking event publishing.
+
+---
+
+## 4. Deterministic Verification Commands
 
 Execute from the `/backend` directory:
 

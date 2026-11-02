@@ -626,16 +626,113 @@ HouseholdInvitation (Collection: householdInvitations/{invitationId}):
 
 ---
 
-## 8. Verification Protocol
+## 8. Verification Protocol & Backend Test Strategy
 
-### Backend (`/backend`)
+### 8.1 Testing Philosophy & Core Invariants
 
-```bash
-cd backend && ./gradlew test
+In accordance with [docs/DESIGN_PHILOSOPHY.md](../DESIGN_PHILOSOPHY.md) (*A Philosophy of Software Design* by John Ousterhout) and [backend/AGENTS.md](../../backend/AGENTS.md):
+
+1. **Test Deep Contracts, Not Internal Mechanics:** Verify the public API contracts of deep services and REST controllers rather than internal implementation mechanics. Avoid brittle, repetitive Mockito chains simulating Google Cloud Firestore SDK internals (`collection().document().get()`).
+2. **Define Errors Out of Existence:** Test that APIs and domain services handle idempotent operations, boundary edge conditions, and null-like queries gracefully (e.g. repeated soft-void requests, duplicate invitation acceptances, and empty result queries returning safe empty collections).
+3. **Guard Critical Financial Invariants:**
+   * **Integer Minor Units:** All monetary values (`amountCents`, `balanceAfterCents`, `initialAmountCents`) must be strictly tested as `long` cents. Ensure zero floating-point `double`/`float` leakage in financial calculations.
+   * **Identity & Tenant Isolation:** Verify that the actor's identity (`uid`, `email`) is extracted strictly from the authenticated server-side `SecurityContextHolder` (`Principal.getName()`), never from client-supplied request payloads. Verify that cross-household requests are rejected with `403 Forbidden`.
+   * **Atomic Concurrency & Rollbacks:** Ensure inter-budget transfers and soft-void operations execute atomically inside Firestore transaction batches, guaranteeing zero ledger balance drift if any single step fails.
+
+---
+
+### 8.2 Backend Multi-Layer Test Pyramid
+
+```
+                ┌──────────────────────────────────┐
+                │   Layer 4: Firestore Emulator    │  <-- Multi-doc transactions, compound
+                │       Integration Tests          │      queries & atomic rollbacks
+                ├──────────────────────────────────┤
+                │   Layer 3: Security & Filters    │  <-- FirebaseTokenFilter, 401/403,
+                │         Web Security             │      CORS preflight, Principal populating
+                ├──────────────────────────────────┤
+                │   Layer 2: Controller Slices     │  <-- @WebMvcTest, Bean Validation (@Valid),
+                │       (@WebMvcTest + MockMvc)    │      HTTP 200/201/400, DTO serialization
+                ├──────────────────────────────────┤
+                │   Layer 1: Pure Domain & Unit    │  <-- Cents math, FX rates, state machine
+                │       (JUnit 5 + AssertJ)        │      transitions (ACTIVE -> LOW_BALANCE)
+                └──────────────────────────────────┘
 ```
 
-### Frontend (`/frontend`)
+#### Layer 1: Pure Domain & Calculation Unit Tests (JUnit 5 + AssertJ)
+
+* **Scope:** Zero Spring context; fast, sub-second execution.
+
+* **Coverage:**
+  * Integer cents arithmetic and FX conversion rounding (`Math.round(sourceCents * exchangeRate)`).
+  * Budget lifecycle state machine derivation:
+    * Balance drops below 10% $\to$ `LOW_BALANCE`.
+    * Balance drops to 0 $\to$ `DEPLETED`.
+    * Balance replenished $\to$ `ACTIVE`.
+  * Transaction soft-void reversal calculations:
+    * Voided transaction produces offsetting ledger entries or balance restorations with `isVoided = true`.
+
+#### Layer 2: REST Controller Slice Tests (`@WebMvcTest`)
+
+* **Scope:** Spring MVC test slice with mocked service dependencies (`@MockBean`).
+
+* **Coverage:**
+  * Verification of `/api/v1/...` REST routing.
+  * Jakarta Bean Validation (`@NotNull`, `@Min(1)`, `@Size`, `@Email`): ensure malformed requests fail immediately with `400 Bad Request`.
+  * JSON serialization/deserialization: camelCase keys, ISO-8601 timestamps, integer cents.
+  * HTTP status codes: `201 Created` with `Location` header or created DTO, `200 OK`, `204 No Content`.
+  * Identity verification: Ensuring controller delegates to services using the authenticated `Principal.getName()`.
+
+#### Layer 3: Security Filter & Context Tests
+
+* **Scope:** Verification of [FirebaseTokenFilter](../../backend/src/main/java/com/house/expensetracker/security/FirebaseTokenFilter.java) and [SecurityConfig](../../backend/src/main/java/com/house/expensetracker/config/SecurityConfig.java).
+
+* **Coverage:**
+  * Requests missing `Authorization: Bearer <token>` fail with `401 Unauthorized`.
+  * Requests with invalid or expired Firebase tokens fail with `401 Unauthorized`.
+  * Valid tokens populate `SecurityContextHolder` with authenticated `uid` details.
+  * CORS preflight `OPTIONS` requests succeed for configured web origins.
+
+#### Layer 4: Deep Service & Firestore Concurrency Integration Tests
+
+* **Scope:** Deep domain services (`HouseholdService`, `BudgetService`, `TransactionService`) tested against the **Firebase Local Emulator Suite** (or Testcontainers) on `localhost:8085`.
+
+* **Coverage:**
+  * Atomic transfers between budgets: Verify that when transferring funds from Budget A to Budget B, both documents and the transfer ledger record update together inside a single atomic Firestore transaction.
+  * Concurrency & contention: Verify behavior under simultaneous balance mutations.
+  * Soft-void idempotency: Calling void twice on the same transaction does not duplicate the balance refund.
+  * Event dispatch: Verify Spring Application Events (`TransactionCreatedEvent`, `BudgetLowBalanceEvent`) are emitted without blocking the primary ledger transaction.
+
+---
+
+### 8.3 Deterministic Verification Commands
+
+#### Backend Verification (`/backend`)
 
 ```bash
+# Run all unit and slice tests
+cd backend && ./gradlew test
+
+# Run a specific test suite or class
+cd backend && ./gradlew test --tests "*ControllerTest*"
+cd backend && ./gradlew test --tests "*ServiceTest*"
+
+# Check compilation and static build without running tests
+cd backend && ./gradlew build -x test
+```
+
+#### Frontend Headless Verification (`/frontend`)
+
+```bash
+# Run Angular unit tests headlessly
 cd frontend && npm test -- --watch=false --browsers=ChromeHeadless
+
+# Full frontend production build check
+cd frontend && npm run build
+```
+
+#### Full Monorepo Build Check
+
+```bash
+cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 ```
