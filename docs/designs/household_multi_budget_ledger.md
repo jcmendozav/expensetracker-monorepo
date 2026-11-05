@@ -779,47 +779,48 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 
 #### Phase 1: Household Core & Security Context
 
-* [ ] **1.1 Household DTOs & Validation:** Define `CreateHouseholdRequest`, `UpdateHouseholdRequest`, and `HouseholdDto` with Jakarta Bean Validation.
-* [ ] **1.2 Household Service & Storage:** Implement `HouseholdService` with Firestore collection `households`, enforcing single active household lookup and multi-currency arrays.
-* [ ] **1.3 Household Controller & Security Slice:** Implement `/api/v1/households` endpoints extracting caller UID from `Principal.getName()`. Add `@WebMvcTest` slice verifying 201/200/400/401/403 responses.
+* [x] **1.1 Household DTOs & Validation:** Define `CreateHouseholdRequest`, `UpdateHouseholdRequest`, and `HouseholdDto` with Jakarta Bean Validation.
+* [x] **1.2 Household Service & Storage:** Implement `HouseholdService` with Firestore collection `households`, enforcing single active household lookup and multi-currency arrays.
+* [ ] **1.3 Household Controller, CORS & Security Context:** Implement `/api/v1/households` endpoints. Enrich `FirebaseTokenFilter` to populate authenticated `uid`, `email`, and `displayName` from the verified token, and enable `PATCH` in CORS configuration (`SecurityConfig` / `WebConfig`). Add `@WebMvcTest` and filter tests.
 * [ ] **1.4 Phase 1 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 2: Budget Domain, State Machine & Liquidity
 
-* [ ] **2.1 Budget DTOs & Lifecycle Domain Logic:** Implement `BudgetDto`, `CreateBudgetRequest`, integer cents math, and unit tests for status derivation (`ACTIVE` $\to$ `LOW_BALANCE` < 10% $\to$ `DEPLETED` == 0).
-* [ ] **2.2 Budget Service & Firestore Integration:** Implement `BudgetService` managing `budgets/{budgetId}` with cached remaining balance snapshots.
-* [ ] **2.3 Budget Controller & Liquidity Summary:** Implement `/api/v1/budgets` and `/api/v1/budgets/summary` endpoints with `@WebMvcTest` slices.
+* [x] **2.1 Budget DTOs & Lifecycle Domain Logic:** Implement `BudgetDto`, `CreateBudgetRequest`, integer cents math, and unit tests for status derivation (`ACTIVE` $\to$ `LOW_BALANCE` < 10% $\to$ `DEPLETED` == 0).
+* [ ] **2.2 Budget Service & Atomic Firestore Integration:** Implement `BudgetService` managing `budgets/{budgetId}` with atomic updates to parent `Household.balancesByCurrency` and `activeBudgetCount` on creation, target allocation adjustment, and archival. Add `BudgetServiceTest`.
+* [ ] **2.3 Budget Controller & Single-Document Liquidity Summary:** Implement `/api/v1/budgets` and `/api/v1/budgets/summary` (reading strictly 1 cached `Household` document per §3.6) with `@WebMvcTest` slices.
 * [ ] **2.4 Phase 2 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 3: Transactions, Atomic Ledger & Transfers
 
-* [ ] **3.1 Transaction DTOs & Invariants:** Define `LogTransactionRequest`, `TransactionDto`, `TransferRequest`, and `TransferResultDto` strictly using `long amountCents`.
-* [ ] **3.2 Transaction Service & Atomic Mutations:** Implement atomic multi-document operations in `TransactionService` (inter-budget transfers, soft-void refunds with `isVoided = true`, snapshotting `balanceAfterCents`).
-* [ ] **3.3 Transaction Controller & Slice Tests:** Implement `/api/v1/budgets/{id}/transactions` and `/api/v1/budgets/transfers`. Verify with `@WebMvcTest`.
+* [x] **3.1 Transaction DTOs & Invariants:** Define `LogTransactionRequest`, `TransactionDto`, `TransferRequest`, and `TransferResultDto` strictly using `long amountCents`.
+* [ ] **3.2 Ledger Service & Atomic Multi-Document Mutations:** Refactor `LedgerService` so `commitTransaction`, `voidTransaction` (idempotent soft-void with refund), and `transferFunds` (inter-budget with FX `Math.round`) execute atomically via `Firestore.runTransaction(...)` and record authenticated `createdByName`. Add `LedgerServiceTest`.
+* [x] **3.3 Transaction Controller & Slice Tests:** Implement `/api/v1/budgets/{id}/transactions` and `/api/v1/budgets/transfers`. Verify with `@WebMvcTest`.
 * [ ] **3.4 Phase 3 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 4: In-App Household Invitations
 
-* [ ] **4.1 Invitation DTOs & State Machine:** Define `InviteCoOwnerRequest`, `HouseholdInvitationDto`, and normalize emails to lowercase.
-* [ ] **4.2 Invitation Service & Member Mutation:** Implement invite creation, pending lookup by authenticated email, atomic accept (updating household `memberUids`), and decline.
-* [ ] **4.3 Invitation Controller Endpoints:** Implement `/api/v1/households/{id}/invitations` and `/api/v1/invitations/...`. Add slice tests.
+* [x] **4.1 Invitation DTOs & State Machine:** Define `InviteCoOwnerRequest`, `HouseholdInvitationDto`, and normalize emails to lowercase.
+* [ ] **4.2 Invitation Service & Atomic Member Mutation:** Implement invite creation, pending lookup strictly by server-side authenticated email, atomic accept (updating invitation + household `members`/`memberIds` inside a transaction), decline, and Owner-only cancel. Add `HouseholdInvitationServiceTest`.
+* [ ] **4.3 Invitation Controller Endpoints:** Implement `/api/v1/households/{id}/invitations` and `/api/v1/invitations/...` extracting caller identity (`uid`, `email`, `displayName`) from the security context. Update slice tests.
 * [ ] **4.4 Phase 4 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 5: Decoupled Activity Alerts & TTL
 
-* [ ] **5.1 Domain Events & Publisher:** Define `TransactionCreatedEvent`, `BudgetLowBalanceEvent`, and Spring `@EventListener` handlers.
-* [ ] **5.2 Notification Service & Storage:** Implement async notification write to `notifications/{id}` with 90-day TTL field.
-* [ ] **5.3 Notification Controller Endpoints:** Implement `/api/v1/notifications` (paginated feed, mark read, mark all read).
+* [ ] **5.1 Domain Events & Async Publisher:** Enable `@EnableAsync`, define `TransactionCreatedEvent`, `BudgetLowBalanceEvent`, and `BUDGET_DEPLETED` handling in `NotificationEventListener`.
+* [ ] **5.2 Notification Service & Cursor Pagination:** Implement async notification write to `notifications/{id}` with 90-day TTL `expiresAt` field and cursor-based pagination in `getNotificationFeed`. Add `NotificationServiceTest`.
+* [x] **5.3 Notification Controller Endpoints:** Implement `/api/v1/notifications` (paginated feed, mark read, mark all read).
 * [ ] **5.4 Phase 5 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
-#### Phase 6: Frontend Angular UI Integration
+#### Phase 6: Frontend Angular UI Integration (`frontend/AGENTS.md` Compliant)
 
-* [ ] **6.1 Angular Services & Models:** Update TypeScript models (cents minor units) and REST API client services using `HttpClient`.
-* [ ] **6.2 Dashboard & Liquidity Cards:** Implement consolidated balance cards and multi-budget summaries in `/dashboard`.
-* [ ] **6.3 Sub-3-Tap Mobile Expense Entry:** Implement bottom sheet with native numeric keypad and budget selector.
-* [ ] **6.4 Inter-Budget Transfer Modal:** Implement transfer sheet with manual FX rate calculator.
-* [ ] **6.5 In-App Notification Drawer & Banners:** Implement pending invite alert banners and activity center feed.
-* [ ] **6.6 Phase 6 Checkpoint:** Run `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless` and `npm run build`.
+* [ ] **6.1 Angular Services & Models:** Enforce `readonly` DI, `import type`, strict server-side identity calls on `HouseholdService`, `BudgetService`, and `NotificationService`, and add colocated `.spec.ts` unit tests.
+* [ ] **6.2 Household Routes (`/households/new` & `/settings/household`):** Implement `HouseholdCreateComponent` (§5.1) and `HouseholdSettingsComponent` (§5.2: edit name/currencies, invite co-owner, view/cancel pending invites, archive/delete household) using Reactive Forms, Signals, and colocated `.spec.ts` tests.
+* [ ] **6.3 Budget Creation & Settings Routes (`/budgets/new` & `/budgets/:id/settings`):** Implement `BudgetCreateComponent` (§5.4) and `BudgetSettingsComponent` (§5.5: rename, adjust total capital allocation, archive budget) with Reactive Forms, Signals, and colocated `.spec.ts` tests.
+* [ ] **6.4 Budget Details Route (`/budgets/:id`) & Transaction Edit Sheet (§5.7 & §5.10):** Implement `BudgetDetailComponent` (`MatTable`, `MatChips`, action bar) and `TransactionEditSheetComponent` (`MatBottomSheet` for category/note edits and soft-void) with colocated `.spec.ts` tests.
+* [ ] **6.5 Sub-3-Tap Mobile Expense Entry & Inter-Budget Transfer Overlays (§5.6 & §5.8):** Refactor `ExpenseEntrySheetComponent` and `TransferModalComponent` to strict Angular 20+ standards (no `standalone: true`, no `CommonModule`, Reactive Forms, `inject(MAT_...)`) with colocated `.spec.ts` tests.
+* [ ] **6.6 Dashboard (`/dashboard`) & In-App Activity Drawer (§5.3 & §5.9):** Refactor `DashboardComponent` and `ActivityDrawerComponent` (`input()`/`output()` signals, pending invitations accept/decline in drawer, `[ ↗ View Budget ]` deep-links, pagination, zero `any`, `??` over `||`, Google style terminology) and register all §5 routes in `app.routes.ts`.
+* [ ] **6.7 Phase 6 Checkpoint:** Run `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless` and `npm run build`.
 
 #### Phase 7: Full Monorepo Verification & Lifecycle Archival
 
