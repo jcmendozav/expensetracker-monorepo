@@ -781,8 +781,8 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 
 * [x] **1.1 Household DTOs & Validation:** Define `CreateHouseholdRequest`, `UpdateHouseholdRequest`, and `HouseholdDto` with Jakarta Bean Validation.
 * [x] **1.2 Household Service & Storage:** Implement `HouseholdService` with Firestore collection `households`, enforcing single active household lookup and multi-currency arrays.
-* [ ] **1.3 Household Controller, CORS & Security Context:** Implement `/api/v1/households` endpoints. Enrich `FirebaseTokenFilter` to populate authenticated `uid`, `email`, and `displayName` from the verified token, and enable `PATCH` in CORS configuration (`SecurityConfig` / `WebConfig`). Add `@WebMvcTest` and filter tests.
-* [ ] **1.4 Phase 1 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+* [x] **1.3 Household Controller, CORS & Security Context:** Implement `/api/v1/households` endpoints. Enrich `FirebaseTokenFilter` to populate authenticated `uid`, `email`, and `displayName` from the verified token, and enable `PATCH` in CORS configuration (`SecurityConfig` / `WebConfig`). Add `@WebMvcTest` and filter tests.
+* [x] **1.4 Phase 1 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 2: Budget Domain, State Machine & Liquidity
 

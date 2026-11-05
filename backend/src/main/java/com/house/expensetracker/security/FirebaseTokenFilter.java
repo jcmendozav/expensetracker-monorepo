@@ -40,16 +40,17 @@ public class FirebaseTokenFilter extends OncePerRequestFilter {
             // 2. Verify the Firebase ID token
             FirebaseToken decodedToken = firebaseAuth.verifyIdToken(idToken);
             String uid = decodedToken.getUid();
+            String email = decodedToken.getEmail() != null ? decodedToken.getEmail().toLowerCase().trim() : null;
+            String displayName = decodedToken.getName();
 
-            // 3. Create the Spring Security Authentication object
-            // The UID becomes the "principal" name (Principal.getName() will return this UID)
+            // 3. Create the Spring Security Authentication object with verified server-side identity
+            AuthenticatedUser principal = new AuthenticatedUser(uid, email, displayName);
             UsernamePasswordAuthenticationToken authentication
-                    = new UsernamePasswordAuthenticationToken(uid, null, null);
+                    = new UsernamePasswordAuthenticationToken(principal, null, java.util.Collections.emptyList());
 
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
             // 4. Set the authentication in the Security Context
-            // This is what makes 'Principal principal' NON-NULL in your Controller!
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
         } catch (Exception e) {
