@@ -132,8 +132,8 @@ To ensure core monetary transactions remain lightning-fast (<100ms) and never fa
 ```mermaid
 sequenceDiagram
     participant Client as Angular Client
-    participant Controller as BudgetController
-    participant Service as LedgerService (Firestore Tx)
+    participant Controller as TransactionController
+    participant Service as TransactionService (Firestore Tx)
     participant Publisher as ApplicationEventPublisher
     participant Listener as NotificationEventListener (@Async)
     participant Inbox as Firestore (notifications)
@@ -787,15 +787,15 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 #### Phase 2: Budget Domain, State Machine & Liquidity
 
 * [x] **2.1 Budget DTOs & Lifecycle Domain Logic:** Implement `BudgetDto`, `CreateBudgetRequest`, integer cents math, and unit tests for status derivation (`ACTIVE` $\to$ `LOW_BALANCE` < 10% $\to$ `DEPLETED` == 0).
-* [ ] **2.2 Budget Service & Atomic Firestore Integration:** Implement `BudgetService` managing `budgets/{budgetId}` with atomic updates to parent `Household.balancesByCurrency` and `activeBudgetCount` on creation, target allocation adjustment, and archival. Add `BudgetServiceTest`.
-* [ ] **2.3 Budget Controller & Single-Document Liquidity Summary:** Implement `/api/v1/budgets` and `/api/v1/budgets/summary` (reading strictly 1 cached `Household` document per §3.6) with `@WebMvcTest` slices.
-* [ ] **2.4 Phase 2 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+* [x] **2.2 Budget Service & Atomic Firestore Integration:** Implement `BudgetService` managing `budgets/{budgetId}` with atomic updates to parent `Household.balancesByCurrency` and `activeBudgetCount` on creation, target allocation adjustment, and archival. Add `BudgetServiceTest`.
+* [x] **2.3 Budget Controller & Single-Document Liquidity Summary:** Implement `/api/v1/budgets` and `/api/v1/budgets/summary` (reading strictly 1 cached `Household` document per §3.6) with `@WebMvcTest` slices.
+* [x] **2.4 Phase 2 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 3: Transactions, Atomic Ledger & Transfers
 
 * [x] **3.1 Transaction DTOs & Invariants:** Define `LogTransactionRequest`, `TransactionDto`, `TransferRequest`, and `TransferResultDto` strictly using `long amountCents`.
-* [ ] **3.2 Ledger Service & Atomic Multi-Document Mutations:** Refactor `LedgerService` so `commitTransaction`, `voidTransaction` (idempotent soft-void with refund), and `transferFunds` (inter-budget with FX `Math.round`) execute atomically via `Firestore.runTransaction(...)` and record authenticated `createdByName`. Add `LedgerServiceTest`.
-* [x] **3.3 Transaction Controller & Slice Tests:** Implement `/api/v1/budgets/{id}/transactions` and `/api/v1/budgets/transfers`. Verify with `@WebMvcTest`.
+* [ ] **3.2 Transaction Service & Atomic Multi-Document Mutations:** Refactor `TransactionService` (removing duplicate `LedgerService`) so `commitTransaction`, `voidTransaction` (idempotent soft-void with refund), and `transferFunds` (inter-budget with FX `Math.round`) execute atomically via `Firestore.runTransaction(...)` / `WriteBatch` and record authenticated `createdByName`. Populate `TransactionServiceTest`.
+* [ ] **3.3 Transaction Controller & Slice Tests:** Move `/api/v1/budgets/{id}/transactions`, `/api/v1/budgets/{id}/transactions/{txId}`, `/api/v1/budgets/{id}/transactions/{txId}/void`, and `/api/v1/budgets/transfers` into `TransactionController` (keeping `BudgetController` focused strictly on `/api/v1/budgets`). Verify with `TransactionControllerTest`.
 * [ ] **3.4 Phase 3 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 4: In-App Household Invitations

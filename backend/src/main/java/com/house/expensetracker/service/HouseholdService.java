@@ -73,6 +73,7 @@ public class HouseholdService {
                 .status("ACTIVE")
                 .baseCurrencies(new ArrayList<>(request.getBaseCurrencies()))
                 .balancesByCurrency(new HashMap<>())
+                .activeBudgetCount(0)
                 .ownerId(callerUid)
                 .members(membersMap)
                 .memberIds(memberIds)
@@ -225,6 +226,7 @@ public class HouseholdService {
         map.put("status", h.getStatus());
         map.put("baseCurrencies", h.getBaseCurrencies());
         map.put("balancesByCurrency", h.getBalancesByCurrency());
+        map.put("activeBudgetCount", h.getActiveBudgetCount() != null ? h.getActiveBudgetCount() : 0);
         map.put("ownerId", h.getOwnerId());
         map.put("memberIds", h.getMemberIds());
         map.put("createdAt", h.getCreatedAt());
@@ -276,6 +278,9 @@ public class HouseholdService {
             });
         }
         h.setBalancesByCurrency(balances);
+
+        Long rawActiveCount = doc.getLong("activeBudgetCount");
+        h.setActiveBudgetCount(rawActiveCount != null ? rawActiveCount.intValue() : 0);
 
         Map<String, Object> rawMembers = (Map<String, Object>) doc.get("members");
         Map<String, HouseholdMember> members = new HashMap<>();

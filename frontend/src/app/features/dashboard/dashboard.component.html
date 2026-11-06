@@ -1,29 +1,235 @@
-<div class="page-container">
+<div class="dashboard-wrapper">
 
-  <!-- ── Stat Cards ── -->
-  <div class="stats-grid">
-    <mat-card class="stat-card" appearance="outlined">
+  <!-- ── 1. Pending Invitations Alert Banner ── -->
+  @if (pendingInvitations().length > 0) {
+    <div class="invitation-banner-container">
+      @for (inv of pendingInvitations(); track inv.id) {
+        <div class="invitation-card">
+          <div class="inv-details">
+            <span class="inv-icon">🏠</span>
+            <div>
+              <strong>Household Invitation</strong>
+              <p>{{ inv.inviterName }} invited you to join "<strong>{{ inv.householdName }}</strong>" as Co-Owner.</p>
+            </div>
+          </div>
+          <div class="inv-actions">
+            <button mat-flat-button color="primary" (click)="acceptInvitation(inv.id)">✅ Accept</button>
+            <button mat-stroked-button color="warn" (click)="declineInvitation(inv.id)">❌ Decline</button>
+          </div>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ── 2. Loading State ── -->
+  @if (isLoading()) {
+    <div class="loading-state">
+      <p>Loading household liquidity and budgets...</p>
+    </div>
+  } @else if (!household()) {
+    <!-- ── 3. Onboarding Prompt (No Active Household) ── -->
+    <div class="onboarding-card">
+      <span class="house-icon">🏡</span>
+      <h2>Welcome to ExpenseTracker</h2>
+      <p>Create or join a household to share multi-budget liquidity with your partner.</p>
+      <button mat-flat-button color="primary" class="onboard-btn" (click)="openHouseholdOnboarding()">
+        + Set Up Household
+      </button>
+    </div>
+  } @else {
+    <!-- ── 4. Main Household Dashboard ── -->
+    <header class="dashboard-header">
+      <div class="household-meta">
+        <h1 class="household-title">🏡 {{ household()?.name }}</h1>
+        <span class="members-tag">
+          Members: {{ household()?.memberIds?.length || 1 }} Active
+        </span>
+      </div>
+
+      <div class="header-controls">
+        <button mat-stroked-button class="transfer-btn" (click)="openTransfer()">
+          ⇄ Transfer Funds
+        </button>
+        <button mat-flat-button color="primary" class="new-budget-btn" (click)="openCreateBudget()">
+          + New Budget
+        </button>
+        <button mat-icon-button class="bell-btn" (click)="toggleActivityDrawer()" aria-label="View notifications">
+          <span [matBadge]="unreadCount()" [matBadgeHidden]="unreadCount() === 0" matBadgeColor="warn" matBadgeSize="small">
+            🔔
+          </span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── 5. Consolidated Liquidity Summary Card ── -->
+    <mat-card class="liquidity-card" appearance="outlined">
+      <mat-card-header>
+        <mat-card-title>HOUSEHOLD CONSOLIDATED LIQUIDITY</mat-card-title>
+      </mat-card-header>
       <mat-card-content>
-        <div class="stat-label">Total Spent</div>
-        <div class="stat-value">{{ totalSpent() | currency:'USD' }}</div>
+        <div class="liquidity-balances">
+          @for (curr of getCurrenciesList(); track curr) {
+            <div class="currency-pill">
+              <span class="curr-code">{{ curr }}</span>
+              <span class="curr-amount">{{ formatCurrency(summary()?.balancesByCurrency?.[curr] || 0, curr) }}</span>
+            </div>
+          }
+        </div>
+        <div class="liquidity-footer">
+          <span>{{ summary()?.activeCount || 0 }} Active Budgets</span>
+          <span>• 1-Step Inter-Budget Transfers Available</span>
+        </div>
       </mat-card-content>
     </mat-card>
-  </div>
 
-  <!-- ── Content Grid: Form | List ── -->
-  <div class="content-grid">
-    <div class="form-panel">
-      <app-transaction-form
-        [transaction]="selectedTransaction()"
-        (transactionAdded)="onTransactionAdded()">
-      </app-transaction-form>
+    <!-- ── 6. Active Budgets Section ── -->
+    <section class="budgets-section">
+      <div class="section-title-row">
+        <h2>ACTIVE BUDGETS</h2>
+      </div>
+
+      @if (budgets().length === 0) {
+        <div class="empty-budgets">
+          <p>No active budgets found in this household.</p>
+          <button mat-stroked-button (click)="openCreateBudget()">Create First Budget</button>
+        </div>
+      } @else {
+        <div class="budgets-grid">
+          @for (budget of budgets(); track budget.id) {
+            <mat-card
+              class="budget-card"
+              [class.selected]="selectedBudgetId() === budget.id"
+              [class.low-balance]="budget.status === 'LOW_BALANCE'"
+              [class.depleted]="budget.status === 'DEPLETED'"
+              appearance="outlined"
+              (click)="selectBudget(budget.id)">
+              <mat-card-header>
+                <div class="budget-card-header">
+                  <span class="budget-title">{{ budget.title }}</span>
+                  <mat-chip-set>
+                    @if (budget.status === 'LOW_BALANCE') {
+                      <mat-chip class="chip-warn">⚠️ Low</mat-chip>
+                    } @else if (budget.status === 'DEPLETED') {
+                      <mat-chip class="chip-danger">Depleted</mat-chip>
+                    } @else {
+                      <mat-chip class="chip-healthy">Healthy</mat-chip>
+                    }
+                  </mat-chip-set>
+                </div>
+              </mat-card-header>
+
+              <mat-card-content>
+                <div class="balance-line">
+                  <strong>{{ formatCurrency(budget.currentBalanceCents, budget.currency) }}</strong>
+                  <span class="total-target">of {{ formatCurrency(budget.initialAmountCents, budget.currency) }}</span>
+                </div>
+
+                <mat-progress-bar
+                  mode="determinate"
+                  [value]="getBudgetProgress(budget)"
+                  [color]="budget.status === 'LOW_BALANCE' ? 'warn' : 'primary'">
+                </mat-progress-bar>
+
+                <div class="progress-label">
+                  <span>{{ getBudgetProgress(budget) }}% remaining</span>
+                </div>
+              </mat-card-content>
+            </mat-card>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- ── 7. Immutable Ledger History Table ── -->
+    @if (selectedBudgetId()) {
+      <section class="ledger-section">
+        <div class="ledger-header">
+          <h3>IMMUTABLE LEDGER HISTORY</h3>
+          <span class="ledger-budget-tag">
+            {{ selectedBudgetTitle() }}
+          </span>
+        </div>
+
+        @if (selectedBudgetLedger().length === 0) {
+          <p class="empty-ledger">No transactions recorded for this budget yet.</p>
+        } @else {
+          <div class="ledger-table-container">
+            <table class="ledger-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Category / Note</th>
+                  <th>Logged By</th>
+                  <th>Amount</th>
+                  <th>Balance After</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (tx of selectedBudgetLedger(); track tx.id) {
+                  <tr [class.voided-row]="tx.status === 'VOIDED'">
+                    <td>{{ tx.transactionDate | date:'shortDate' }} {{ tx.transactionDate | date:'shortTime' }}</td>
+                    <td>
+                      <span class="tx-type-tag" [class.type-spending]="tx.type === 'SPENDING'" [class.type-income]="tx.type === 'INCOME'">
+                        {{ tx.type }}
+                      </span>
+                    </td>
+                    <td>
+                      <strong>{{ tx.category }}</strong>
+                      @if (tx.note) {
+                        <div class="tx-note">{{ tx.note }}</div>
+                      }
+                    </td>
+                    <td>{{ tx.createdByName || 'User' }}</td>
+                    <td class="amount-cell" [class.neg]="tx.type === 'SPENDING' || tx.type === 'TRANSFER_OUT'" [class.pos]="tx.type === 'INCOME' || tx.type === 'TRANSFER_IN'">
+                      {{ tx.type === 'SPENDING' || tx.type === 'TRANSFER_OUT' ? '-' : '+' }}{{ tx.amountCents / 100 | number:'1.2-2' }}
+                    </td>
+                    <td>{{ tx.balanceAfterCents / 100 | number:'1.2-2' }}</td>
+                    <td>
+                      <span class="status-badge" [class.status-void]="tx.status === 'VOIDED'">
+                        {{ tx.status }}
+                      </span>
+                    </td>
+                    <td>
+                      @if (tx.status === 'COMMITTED') {
+                        <button mat-button class="void-btn" (click)="voidTransaction(selectedBudgetId()!, tx.id)">
+                          Void
+                        </button>
+                      }
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    }
+
+    <!-- ── 8. Floating Action Button (FAB) for Sub-3-Tap Expense Entry ── -->
+    <button
+      mat-fab
+      color="primary"
+      class="fab-log-btn"
+      (click)="openExpenseEntry()"
+      aria-label="Log expense in 3 taps">
+      +
+    </button>
+  }
+
+  <!-- ── 9. Activity Center Drawer Sidenav Overlay ── -->
+  @if (isActivityDrawerOpen()) {
+    <div class="drawer-overlay" (click)="toggleActivityDrawer()">
+      <div class="drawer-container" (click)="$event.stopPropagation()">
+        <app-activity-drawer
+          [notifications]="notifications()"
+          (close)="toggleActivityDrawer()"
+          (refreshed)="loadAll()">
+        </app-activity-drawer>
+      </div>
     </div>
-    <div class="list-panel">
-      <app-transaction-list
-        [refresh]="refresh()"
-        (edit)="onEditTransaction($event)">
-      </app-transaction-list>
-    </div>
-  </div>
+  }
 
 </div>

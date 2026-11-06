@@ -24,6 +24,8 @@ public class Household {
     private List<String> baseCurrencies = new ArrayList<>();
     @Builder.Default
     private Map<String, Long> balancesByCurrency = new HashMap<>();
+    @Builder.Default
+    private Integer activeBudgetCount = 0;
     private String ownerId;
     @Builder.Default
     private Map<String, HouseholdMember> members = new HashMap<>();
