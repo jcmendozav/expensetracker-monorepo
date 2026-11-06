@@ -1,15 +1,16 @@
-import { Component, Inject, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { DecimalPipe } from '@angular/common';
 import { MAT_BOTTOM_SHEET_DATA, MatBottomSheetRef } from '@angular/material/bottom-sheet';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { Budget } from '../../core/models/budget.model';
+import { firstValueFrom } from 'rxjs';
+import type { Budget } from '../../core/models/budget.model';
 import { BudgetService } from '../../core/services/budget.service';
-import { LogTransactionRequest } from '../../core/models/ledger.model';
+import type { LogTransactionRequest } from '../../core/models/ledger.model';
 
 export interface ExpenseEntrySheetData {
   budgets: Budget[];
@@ -18,10 +19,9 @@ export interface ExpenseEntrySheetData {
 
 @Component({
   selector: 'app-expense-entry-sheet',
-  standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
+    DecimalPipe,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -30,12 +30,12 @@ export interface ExpenseEntrySheetData {
   ],
   template: `
     <div class="sheet-container">
-      <div class="drag-handle"></div>
+      <div class="drag-handle" aria-hidden="true"></div>
       <div class="sheet-header">
-        <h2>LOG TRANSACTION</h2>
+        <h2>Log Transaction</h2>
         <mat-button-toggle-group [(ngModel)]="type" name="txType" aria-label="Transaction Type">
           <mat-button-toggle value="SPENDING">Expense</mat-button-toggle>
-          <mat-button-toggle value="INCOME">+ Top-up</mat-button-toggle>
+          <mat-button-toggle value="INCOME">Top-up</mat-button-toggle>
         </mat-button-toggle-group>
       </div>
 
@@ -44,7 +44,7 @@ export interface ExpenseEntrySheetData {
         <mat-select [(ngModel)]="selectedBudgetId" name="budgetSelect">
           @for (budget of data.budgets; track budget.id) {
             <mat-option [value]="budget.id">
-              {{ budget.title }} ({{ budget.currency }} {{ budget.currentBalanceCents / 100 | number:'1.2-2' }} remaining)
+              {{ budget.title }} ({{ budget.currency }} {{ (budget.currentBalanceCents / 100) | number:'1.2-2' }} remaining)
             </mat-option>
           }
         </mat-select>
@@ -61,8 +61,7 @@ export interface ExpenseEntrySheetData {
           [(ngModel)]="amount"
           name="amountInput"
           placeholder="0.00"
-          required
-          autofocus />
+          required />
         <span matTextPrefix class="amount-prefix">{{ selectedBudgetCurrency() }}&nbsp;</span>
       </mat-form-field>
 
@@ -77,7 +76,7 @@ export interface ExpenseEntrySheetData {
       </mat-form-field>
 
       @if (errorMessage()) {
-        <div class="error-banner">{{ errorMessage() }}</div>
+        <div class="error-banner" role="alert">{{ errorMessage() }}</div>
       }
 
       <div class="actions">
@@ -88,7 +87,7 @@ export interface ExpenseEntrySheetData {
           type="button"
           [disabled]="isSubmitting() || !amount || amount <= 0 || !selectedBudgetId || !category"
           (click)="submit()">
-          {{ isSubmitting() ? 'Saving...' : 'Confirm & Save Transaction (Tap 3)' }}
+          {{ isSubmitting() ? 'Saving...' : 'Confirm & Save' }}
         </button>
       </div>
     </div>
@@ -102,78 +101,72 @@ export interface ExpenseEntrySheetData {
     .drag-handle {
       width: 40px;
       height: 4px;
-      background: #ccc;
+      background: #cbd5e1;
       border-radius: 2px;
-      margin: 0 auto 12px;
+      margin: 0 auto 16px;
     }
     .sheet-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 16px;
+      margin-bottom: 20px;
     }
     .sheet-header h2 {
       margin: 0;
-      font-size: 1.1rem;
-      font-weight: 600;
+      font-size: 1.15rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
     .full-width {
       width: 100%;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
     .amount-field input {
       font-size: 1.4rem;
       font-weight: 600;
     }
     .amount-prefix {
-      font-weight: 600;
-      font-size: 1.2rem;
+      font-weight: 700;
+      color: #64748b;
+    }
+    .error-banner {
+      background: #fee2e2;
+      color: #b91c1c;
+      padding: 8px 12px;
+      border-radius: 6px;
+      margin-bottom: 16px;
+      font-size: 0.85rem;
     }
     .actions {
       display: flex;
       justify-content: flex-end;
       gap: 12px;
-      margin-top: 12px;
-    }
-    .error-banner {
-      color: #b00020;
-      font-size: 0.85rem;
-      margin-bottom: 8px;
+      margin-top: 8px;
     }
   `]
 })
 export class ExpenseEntrySheetComponent {
-  private bottomSheetRef = inject(MatBottomSheetRef<ExpenseEntrySheetComponent>);
-  private budgetService = inject(BudgetService);
+  readonly data = inject<ExpenseEntrySheetData>(MAT_BOTTOM_SHEET_DATA);
+  private readonly bottomSheetRef = inject(MatBottomSheetRef<ExpenseEntrySheetComponent>);
+  private readonly budgetService = inject(BudgetService);
 
   type: 'SPENDING' | 'INCOME' = 'SPENDING';
-  selectedBudgetId = '';
+  selectedBudgetId: string = this.data.defaultBudgetId ?? (this.data.budgets.length > 0 ? this.data.budgets[0].id : '');
   amount: number | null = null;
-  category = 'General';
+  category = '';
   note = '';
 
-  isSubmitting = signal(false);
-  errorMessage = signal<string | null>(null);
-
-  constructor(@Inject(MAT_BOTTOM_SHEET_DATA) public data: ExpenseEntrySheetData) {
-    if (data.defaultBudgetId) {
-      this.selectedBudgetId = data.defaultBudgetId;
-    } else if (data.budgets.length > 0) {
-      this.selectedBudgetId = data.budgets[0].id;
-    }
-  }
+  readonly isSubmitting = signal(false);
+  readonly errorMessage = signal<string | null>(null);
 
   selectedBudgetCurrency(): string {
-    const budget = this.data.budgets.find(b => b.id === this.selectedBudgetId);
-    return budget ? budget.currency : '';
+    const b = this.data.budgets.find(item => item.id === this.selectedBudgetId);
+    return b ? b.currency : 'PEN';
   }
 
-  cancel(): void {
-    this.bottomSheetRef.dismiss(null);
-  }
-
-  submit(): void {
-    if (!this.selectedBudgetId || !this.amount || this.amount <= 0 || !this.category) {
+  async submit(): Promise<void> {
+    if (!this.selectedBudgetId || !this.amount || this.amount <= 0 || !this.category.trim()) {
       return;
     }
 
@@ -181,23 +174,25 @@ export class ExpenseEntrySheetComponent {
     this.errorMessage.set(null);
 
     const amountCents = Math.round(this.amount * 100);
+
     const request: LogTransactionRequest = {
       type: this.type,
       amountCents,
-      category: this.category,
-      note: this.note.trim() || undefined
+      category: this.category.trim(),
+      note: this.note.trim() ? this.note.trim() : undefined
     };
 
-    this.budgetService.logTransaction(this.selectedBudgetId, request).subscribe({
-      next: (res) => {
-        this.isSubmitting.set(false);
-        this.bottomSheetRef.dismiss(res);
-      },
-      error: (err) => {
-        this.isSubmitting.set(false);
-        this.errorMessage.set(err.error?.message || 'Failed to log transaction. Please try again.');
-      }
-    });
+    try {
+      await firstValueFrom(this.budgetService.logTransaction(this.selectedBudgetId, request));
+      this.bottomSheetRef.dismiss(true);
+    } catch (err: unknown) {
+      this.errorMessage.set('Failed to save transaction. Please check your network and balance.');
+    } finally {
+      this.isSubmitting.set(false);
+    }
+  }
+
+  cancel(): void {
+    this.bottomSheetRef.dismiss(false);
   }
 }
-

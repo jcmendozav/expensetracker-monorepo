@@ -819,13 +819,13 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 
 #### Phase 6: Frontend Angular UI Integration (`frontend/AGENTS.md` Compliant)
 
-* [ ] **6.1 Angular Services & Models:** Enforce `readonly` DI, `import type`, strict server-side identity calls on `HouseholdService`, `BudgetService`, and `NotificationService`, and add colocated `.spec.ts` unit tests.
-* [ ] **6.2 Household Routes (`/households/new` & `/settings/household`):** Implement `HouseholdCreateComponent` (§5.1) and `HouseholdSettingsComponent` (§5.2: edit name/currencies, invite co-owner, view/cancel pending invites, archive/delete household) using Reactive Forms, Signals, and colocated `.spec.ts` tests.
-* [ ] **6.3 Budget Creation & Settings Routes (`/budgets/new` & `/budgets/:id/settings`):** Implement `BudgetCreateComponent` (§5.4) and `BudgetSettingsComponent` (§5.5: rename, adjust total capital allocation, archive budget) with Reactive Forms, Signals, and colocated `.spec.ts` tests.
-* [ ] **6.4 Budget Details Route (`/budgets/:id`) & Transaction Edit Sheet (§5.7 & §5.10):** Implement `BudgetDetailComponent` (`MatTable`, `MatChips`, action bar) and `TransactionEditSheetComponent` (`MatBottomSheet` for category/note edits and soft-void) with colocated `.spec.ts` tests.
-* [ ] **6.5 Sub-3-Tap Mobile Expense Entry & Inter-Budget Transfer Overlays (§5.6 & §5.8):** Refactor `ExpenseEntrySheetComponent` and `TransferModalComponent` to strict Angular 20+ standards (no `standalone: true`, no `CommonModule`, Reactive Forms, `inject(MAT_...)`) with colocated `.spec.ts` tests.
-* [ ] **6.6 Dashboard (`/dashboard`) & In-App Activity Drawer (§5.3 & §5.9):** Refactor `DashboardComponent` and `ActivityDrawerComponent` (`input()`/`output()` signals, pending invitations accept/decline in drawer, `[ ↗ View Budget ]` deep-links, pagination, zero `any`, `??` over `||`, Google style terminology) and register all §5 routes in `app.routes.ts`.
-* [ ] **6.7 Phase 6 Checkpoint:** Run `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless` and `npm run build`.
+* [x] **6.1 Angular Services & Models:** Enforce `readonly` DI, `import type`, strict server-side identity calls on `HouseholdService`, `BudgetService`, and `NotificationService`, and add colocated `.spec.ts` unit tests.
+* [x] **6.2 Household Routes (`/households/new` & `/settings/household`):** Implement `HouseholdCreateComponent` (§5.1) and `HouseholdSettingsComponent` (§5.2: edit name/currencies, invite co-owner, view/cancel pending invites, archive/delete household) using Reactive Forms, Signals, and colocated `.spec.ts` tests.
+* [x] **6.3 Budget Creation & Settings Routes (`/budgets/new` & `/budgets/:id/settings`):** Implement `BudgetCreateComponent` (§5.4) and `BudgetSettingsComponent` (§5.5: rename, adjust total capital allocation, archive budget) with Reactive Forms, Signals, and colocated `.spec.ts` tests.
+* [x] **6.4 Budget Details Route (`/budgets/:id`) & Transaction Edit Sheet (§5.7 & §5.10):** Implement `BudgetDetailComponent` (`MatTable`, `MatChips`, action bar) and `TransactionEditSheetComponent` (`MatBottomSheet` for category/note edits and soft-void) with colocated `.spec.ts` tests.
+* [x] **6.5 Sub-3-Tap Mobile Expense Entry & Inter-Budget Transfer Overlays (§5.6 & §5.8):** Refactor `ExpenseEntrySheetComponent` and `TransferModalComponent` to strict Angular 20+ standards (no `standalone: true`, no `CommonModule`, Reactive Forms, `inject(MAT_...)`) with colocated `.spec.ts` tests.
+* [x] **6.6 Dashboard (`/dashboard`) & In-App Activity Drawer (§5.3 & §5.9):** Refactor `DashboardComponent` and `ActivityDrawerComponent` (`input()`/`output()` signals, pending invitations accept/decline in drawer, `[ ↗ View Budget ]` deep-links, pagination, zero `any`, `??` over `||`, Google style terminology) and register all §5 routes in `app.routes.ts`.
+* [x] **6.7 Phase 6 Checkpoint:** Run `cd frontend && npm test -- --watch=false --browsers=ChromeHeadless` and `npm run build`.
 
 #### Phase 7: Full Monorepo Verification & Lifecycle Archival
 

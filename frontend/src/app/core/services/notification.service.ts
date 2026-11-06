@@ -1,15 +1,15 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { NotificationFeedResponse } from '../models/notification.model';
+import type { Observable } from 'rxjs';
+import type { NotificationFeedResponse } from '../models/notification.model';
 import { environment } from '../../../environments/environments';
 
 @Injectable({
   providedIn: 'root'
 })
 export class NotificationService {
-  private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/v1/notifications`;
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${environment.apiUrl}/v1/notifications`;
 
   getFeed(limit = 20, cursor?: string): Observable<NotificationFeedResponse> {
     let params = new HttpParams().set('limit', limit.toString());
@@ -27,4 +27,3 @@ export class NotificationService {
     return this.http.post<{ updatedCount: number }>(`${this.baseUrl}/mark-all-read`, null);
   }
 }
-

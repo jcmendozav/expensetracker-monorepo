@@ -1,14 +1,15 @@
-import { Component, Inject, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
-import { Budget } from '../../core/models/budget.model';
+import type { Budget } from '../../core/models/budget.model';
 import { BudgetService } from '../../core/services/budget.service';
-import { TransferRequest } from '../../core/models/ledger.model';
+import type { TransferRequest } from '../../core/models/ledger.model';
 
 export interface TransferModalData {
   budgets: Budget[];
@@ -17,10 +18,9 @@ export interface TransferModalData {
 
 @Component({
   selector: 'app-transfer-modal',
-  standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
+    DecimalPipe,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -28,11 +28,14 @@ export interface TransferModalData {
     MatButtonModule
   ],
   template: `
-    <h2 mat-dialog-title>Transfer / Split Budget Funds</h2>
+    <h2 mat-dialog-title>Transfer Funds</h2>
     <mat-dialog-content>
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Source Budget</mat-label>
-        <mat-select [(ngModel)]="sourceBudgetId" name="sourceBudgetSelect" (selectionChange)="onBudgetChange()">
+        <mat-label>Source budget</mat-label>
+        <mat-select
+          [(ngModel)]="sourceBudgetId"
+          name="sourceBudgetSelect"
+          (selectionChange)="onBudgetChange()">
           @for (b of data.budgets; track b.id) {
             <mat-option [value]="b.id">
               {{ b.title }} ({{ b.currency }} {{ b.currentBalanceCents / 100 | number:'1.2-2' }} available)
@@ -42,8 +45,11 @@ export interface TransferModalData {
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Destination Budget</mat-label>
-        <mat-select [(ngModel)]="targetBudgetId" name="targetBudgetSelect" (selectionChange)="onBudgetChange()">
+        <mat-label>Destination budget</mat-label>
+        <mat-select
+          [(ngModel)]="targetBudgetId"
+          name="targetBudgetSelect"
+          (selectionChange)="onBudgetChange()">
           @for (b of destinationCandidates(); track b.id) {
             <mat-option [value]="b.id">
               {{ b.title }} ({{ b.currency }} {{ b.currentBalanceCents / 100 | number:'1.2-2' }})
@@ -53,7 +59,7 @@ export interface TransferModalData {
       </mat-form-field>
 
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Transfer Amount</mat-label>
+        <mat-label>Transfer amount</mat-label>
         <input
           matInput
           type="number"
@@ -70,7 +76,7 @@ export interface TransferModalData {
       @if (isCrossCurrency()) {
         <div class="fx-section">
           <mat-form-field appearance="outline" class="fx-rate-field">
-            <mat-label>Exchange Rate (1 {{ sourceCurrency() }} = ? {{ targetCurrency() }})</mat-label>
+            <mat-label>Exchange rate (1 {{ sourceCurrency() }} = ? {{ targetCurrency() }})</mat-label>
             <input
               matInput
               type="number"
@@ -84,19 +90,19 @@ export interface TransferModalData {
           </mat-form-field>
 
           <div class="calculated-preview">
-            Target Receives:
+            Target receives:
             <strong>{{ targetCurrency() }} {{ estimatedTargetAmount() | number:'1.2-2' }}</strong>
           </div>
         </div>
       }
 
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Note (Optional)</mat-label>
+        <mat-label>Note (optional)</mat-label>
         <input matInput [(ngModel)]="note" name="noteInput" placeholder="Reason for transfer" />
       </mat-form-field>
 
       @if (errorMessage()) {
-        <div class="error-banner">{{ errorMessage() }}</div>
+        <div class="error-banner" role="alert">{{ errorMessage() }}</div>
       }
     </mat-dialog-content>
 
@@ -108,7 +114,7 @@ export interface TransferModalData {
         type="button"
         [disabled]="isSubmitting() || !isValid()"
         (click)="submit()">
-        {{ isSubmitting() ? 'Transferring...' : 'Confirm Transfer' }}
+        {{ isSubmitting() ? 'Transferring...' : 'Confirm transfer' }}
       </button>
     </mat-dialog-actions>
   `,
@@ -141,8 +147,9 @@ export interface TransferModalData {
   `]
 })
 export class TransferModalComponent {
-  private dialogRef = inject(MatDialogRef<TransferModalComponent>);
-  private budgetService = inject(BudgetService);
+  readonly dialogRef = inject(MatDialogRef<TransferModalComponent>);
+  readonly data: TransferModalData = inject(MAT_DIALOG_DATA);
+  private readonly budgetService = inject(BudgetService);
 
   sourceBudgetId = '';
   targetBudgetId = '';
@@ -150,14 +157,14 @@ export class TransferModalComponent {
   exchangeRate: number | null = null;
   note = '';
 
-  isSubmitting = signal(false);
-  errorMessage = signal<string | null>(null);
+  readonly isSubmitting = signal(false);
+  readonly errorMessage = signal<string | null>(null);
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: TransferModalData) {
-    if (data.defaultSourceBudgetId) {
-      this.sourceBudgetId = data.defaultSourceBudgetId;
-    } else if (data.budgets.length > 0) {
-      this.sourceBudgetId = data.budgets[0].id;
+  constructor() {
+    if (this.data?.defaultSourceBudgetId) {
+      this.sourceBudgetId = this.data.defaultSourceBudgetId;
+    } else if (this.data?.budgets && this.data.budgets.length > 0) {
+      this.sourceBudgetId = this.data.budgets[0].id;
     }
 
     const destinations = this.destinationCandidates();
@@ -168,6 +175,7 @@ export class TransferModalComponent {
   }
 
   destinationCandidates(): Budget[] {
+    if (!this.data?.budgets) return [];
     return this.data.budgets.filter(b => b.id !== this.sourceBudgetId);
   }
 
@@ -180,12 +188,12 @@ export class TransferModalComponent {
   }
 
   sourceCurrency(): string {
-    const b = this.data.budgets.find(b => b.id === this.sourceBudgetId);
+    const b = this.data?.budgets?.find(item => item.id === this.sourceBudgetId);
     return b ? b.currency : '';
   }
 
   targetCurrency(): string {
-    const b = this.data.budgets.find(b => b.id === this.targetBudgetId);
+    const b = this.data?.budgets?.find(item => item.id === this.targetBudgetId);
     return b ? b.currency : '';
   }
 
@@ -198,7 +206,6 @@ export class TransferModalComponent {
   private updateDefaultFx(): void {
     if (this.isCrossCurrency()) {
       if (!this.exchangeRate || this.exchangeRate <= 0) {
-        // reasonable default e.g. 1.0 or leave null
         this.exchangeRate = 1.0;
       }
     } else {
@@ -209,7 +216,7 @@ export class TransferModalComponent {
   estimatedTargetAmount(): number {
     if (!this.sourceAmount || this.sourceAmount <= 0) return 0;
     if (!this.isCrossCurrency()) return this.sourceAmount;
-    const rate = this.exchangeRate || 1.0;
+    const rate = this.exchangeRate ?? 1.0;
     return Math.round(this.sourceAmount * rate * 100) / 100;
   }
 
@@ -235,8 +242,8 @@ export class TransferModalComponent {
       sourceBudgetId: this.sourceBudgetId,
       targetBudgetId: this.targetBudgetId,
       sourceAmountCents: Math.round(this.sourceAmount! * 100),
-      exchangeRate: this.isCrossCurrency() ? this.exchangeRate! : undefined,
-      note: this.note.trim() || undefined
+      exchangeRate: this.isCrossCurrency() ? (this.exchangeRate ?? undefined) : undefined,
+      note: this.note.trim() ? this.note.trim() : undefined
     };
 
     this.budgetService.transferFunds(request).subscribe({
@@ -244,11 +251,14 @@ export class TransferModalComponent {
         this.isSubmitting.set(false);
         this.dialogRef.close(res);
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.isSubmitting.set(false);
-        this.errorMessage.set(err.error?.message || 'Transfer failed. Please check funds.');
+        if (err instanceof HttpErrorResponse) {
+          this.errorMessage.set(err.error?.message ?? err.message ?? 'Transfer failed.');
+        } else {
+          this.errorMessage.set('Transfer failed. Please check funds.');
+        }
       }
     });
   }
 }
-

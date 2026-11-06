@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DecimalPipe, DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
@@ -13,21 +15,23 @@ import { AuthService } from '../../core/services/auth.service';
 import { HouseholdService } from '../../core/services/household.service';
 import { BudgetService } from '../../core/services/budget.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { Household, HouseholdInvitation } from '../../core/models/household.model';
-import { Budget, LiquiditySummary } from '../../core/models/budget.model';
-import { LedgerTransaction } from '../../core/models/ledger.model';
-import { AppNotification } from '../../core/models/notification.model';
+import type { Household, HouseholdInvitation } from '../../core/models/household.model';
+import type { Budget, LiquiditySummary } from '../../core/models/budget.model';
+import type { LedgerTransaction } from '../../core/models/ledger.model';
+import type { AppNotification } from '../../core/models/notification.model';
 import { ExpenseEntrySheetComponent } from '../expense-entry-sheet/expense-entry-sheet.component';
 import { TransferModalComponent } from '../transfer-modal/transfer-modal.component';
 import { BudgetCreateDialogComponent } from '../budget-dialog/budget-create-dialog.component';
 import { HouseholdCreateDialogComponent } from '../household-dialog/household-create-dialog.component';
 import { ActivityDrawerComponent } from '../activity-drawer/activity-drawer.component';
+import { TransactionEditSheetComponent } from '../transaction-edit-sheet/transaction-edit-sheet.component';
 
 @Component({
   selector: 'app-dashboard',
-  standalone: true,
   imports: [
-    CommonModule,
+    DecimalPipe,
+    DatePipe,
+    RouterLink,
     MatCardModule,
     MatButtonModule,
     MatProgressBarModule,
@@ -42,23 +46,30 @@ import { ActivityDrawerComponent } from '../activity-drawer/activity-drawer.comp
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardComponent implements OnInit {
-  authService = inject(AuthService);
-  private householdService = inject(HouseholdService);
-  private budgetService = inject(BudgetService);
-  private notificationService = inject(NotificationService);
-  private dialog = inject(MatDialog);
-  private bottomSheet = inject(MatBottomSheet);
+  readonly authService = inject(AuthService);
+  private readonly householdService = inject(HouseholdService);
+  private readonly budgetService = inject(BudgetService);
+  private readonly notificationService = inject(NotificationService);
+  private readonly dialog = inject(MatDialog);
+  private readonly bottomSheet = inject(MatBottomSheet);
 
-  household = signal<Household | null>(null);
-  budgets = signal<Budget[]>([]);
-  summary = signal<LiquiditySummary | null>(null);
-  pendingInvitations = signal<HouseholdInvitation[]>([]);
-  notifications = signal<AppNotification[]>([]);
-  selectedBudgetId = signal<string | null>(null);
-  selectedBudgetLedger = signal<LedgerTransaction[]>([]);
+  readonly household = signal<Household | null>(null);
+  readonly budgets = signal<Budget[]>([]);
+  readonly summary = signal<LiquiditySummary | null>(null);
+  readonly pendingInvitations = signal<HouseholdInvitation[]>([]);
+  readonly notifications = signal<AppNotification[]>([]);
+  readonly selectedBudgetId = signal<string | null>(null);
+  readonly selectedBudgetLedger = signal<LedgerTransaction[]>([]);
 
-  isLoading = signal(true);
-  isActivityDrawerOpen = signal(false);
+  readonly isLoading = signal(true);
+  readonly isActivityDrawerOpen = signal(false);
+
+  readonly unreadCount = computed(() => this.notifications().filter(n => !n.isRead).length);
+  readonly selectedBudget = computed(() => this.budgets().find(b => b.id === this.selectedBudgetId()) ?? null);
+  readonly currenciesList = computed(() => {
+    const s = this.summary();
+    return s ? Object.keys(s.balancesByCurrency) : [];
+  });
 
   ngOnInit(): void {
     this.loadAll();
@@ -66,23 +77,19 @@ export class DashboardComponent implements OnInit {
 
   async loadAll(): Promise<void> {
     this.isLoading.set(true);
-    const user = this.authService.user();
-    const userEmail = user?.email || undefined;
 
     try {
-      // 1. Check for pending invitations
-      if (userEmail) {
-        const invites = await firstValueFrom(this.householdService.getPendingInvitations(userEmail));
-        this.pendingInvitations.set(invites);
-      }
+      // 1. Check for pending invitations (server extracts user from token)
+      const invites = await firstValueFrom(this.householdService.getPendingInvitations());
+      this.pendingInvitations.set(invites);
 
       // 2. Fetch current active household
       let hh: Household | null = null;
       try {
         hh = await firstValueFrom(this.householdService.getCurrentHousehold());
         this.household.set(hh);
-      } catch (err: any) {
-        if (err?.status === 404) {
+      } catch (err: unknown) {
+        if (err instanceof HttpErrorResponse && err.status === 404) {
           this.household.set(null);
         } else {
           console.error('Error fetching household', err);
@@ -108,15 +115,11 @@ export class DashboardComponent implements OnInit {
           this.selectBudget(budgetsRes.items[0].id);
         }
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load dashboard data', e);
     } finally {
       this.isLoading.set(false);
     }
-  }
-
-  unreadCount(): number {
-    return this.notifications().filter(n => !n.isRead).length;
   }
 
   toggleActivityDrawer(): void {
@@ -137,7 +140,7 @@ export class DashboardComponent implements OnInit {
       width: '450px',
       data: {
         householdId: hh.id,
-        availableCurrencies: hh.baseCurrencies || ['PEN', 'USD']
+        availableCurrencies: hh.baseCurrencies.length > 0 ? hh.baseCurrencies : ['PEN', 'USD']
       }
     });
     ref.afterClosed().subscribe((res) => {
@@ -149,7 +152,7 @@ export class DashboardComponent implements OnInit {
     const sheetRef = this.bottomSheet.open(ExpenseEntrySheetComponent, {
       data: {
         budgets: this.budgets(),
-        defaultBudgetId: this.selectedBudgetId() || undefined
+        defaultBudgetId: this.selectedBudgetId() ?? undefined
       }
     });
     sheetRef.afterDismissed().subscribe((res) => {
@@ -162,7 +165,7 @@ export class DashboardComponent implements OnInit {
       width: '500px',
       data: {
         budgets: this.budgets(),
-        defaultSourceBudgetId: this.selectedBudgetId() || undefined
+        defaultSourceBudgetId: this.selectedBudgetId() ?? undefined
       }
     });
     dialogRef.afterClosed().subscribe((res) => {
@@ -179,26 +182,41 @@ export class DashboardComponent implements OnInit {
     try {
       const items = await firstValueFrom(this.budgetService.listTransactions(budgetId));
       this.selectedBudgetLedger.set(items);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to load ledger', e);
     }
+  }
+
+  openEditSheet(tx: LedgerTransaction): void {
+    const budget = this.selectedBudget();
+    if (!budget) return;
+
+    const ref = this.bottomSheet.open(TransactionEditSheetComponent, {
+      data: {
+        transaction: tx,
+        budgetId: budget.id,
+        currency: budget.currency
+      }
+    });
+    ref.afterDismissed().subscribe((res) => {
+      if (res) this.loadAll();
+    });
   }
 
   async voidTransaction(budgetId: string, txId: string): Promise<void> {
     try {
       await firstValueFrom(this.budgetService.voidTransaction(budgetId, txId));
       this.loadAll();
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to void transaction', e);
     }
   }
 
   async acceptInvitation(invId: string): Promise<void> {
-    const user = this.authService.user();
     try {
-      await firstValueFrom(this.householdService.acceptInvitation(invId, user?.email || undefined, user?.displayName || undefined));
+      await firstValueFrom(this.householdService.acceptInvitation(invId));
       this.loadAll();
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to accept invite', e);
     }
   }
@@ -207,7 +225,7 @@ export class DashboardComponent implements OnInit {
     try {
       await firstValueFrom(this.householdService.declineInvitation(invId));
       this.loadAll();
-    } catch (e) {
+    } catch (e: unknown) {
       console.error('Failed to decline invite', e);
     }
   }
@@ -223,13 +241,8 @@ export class DashboardComponent implements OnInit {
     return `${curr} ${major}`;
   }
 
-  getCurrenciesList(): string[] {
-    const s = this.summary();
-    return s ? Object.keys(s.balancesByCurrency) : [];
-  }
-
   selectedBudgetTitle(): string {
-    const b = this.budgets().find(item => item.id === this.selectedBudgetId());
+    const b = this.selectedBudget();
     return b ? b.title : '';
   }
 }

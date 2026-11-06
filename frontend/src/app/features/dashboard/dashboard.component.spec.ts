@@ -1,6 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
+import { signal } from '@angular/core';
 import { DashboardComponent } from './dashboard.component';
 import { HouseholdService } from '../../core/services/household.service';
 import { BudgetService } from '../../core/services/budget.service';
@@ -14,7 +16,7 @@ describe('DashboardComponent', () => {
   const mockHousehold = {
     id: 'hh_123',
     name: 'Mendoza Family',
-    status: 'ACTIVE',
+    status: 'ACTIVE' as const,
     baseCurrencies: ['PEN', 'USD'],
     balancesByCurrency: { PEN: 1420000, USD: 85000 },
     ownerId: 'usr_carlos_123',
@@ -29,7 +31,7 @@ describe('DashboardComponent', () => {
     getPendingInvitations: () => of([]),
     createHousehold: () => of(mockHousehold),
     acceptInvitation: () => of(mockHousehold),
-    declineInvitation: () => of({ id: 'inv_1', status: 'DECLINED' })
+    declineInvitation: () => of(undefined)
   };
 
   const mockBudgetService = {
@@ -48,7 +50,7 @@ describe('DashboardComponent', () => {
   };
 
   const mockAuthService = {
-    user: () => ({ uid: 'usr_carlos_123', email: 'carlos@example.com', displayName: 'Carlos' }),
+    user: signal({ uid: 'usr_carlos_123', email: 'carlos@example.com', displayName: 'Carlos' }),
     getToken: () => Promise.resolve('mock-token'),
     logout: () => of(undefined)
   };
@@ -58,6 +60,7 @@ describe('DashboardComponent', () => {
       imports: [DashboardComponent],
       providers: [
         provideNoopAnimations(),
+        provideRouter([]),
         { provide: HouseholdService, useValue: mockHouseholdService },
         { provide: BudgetService, useValue: mockBudgetService },
         { provide: NotificationService, useValue: mockNotificationService },
@@ -75,5 +78,6 @@ describe('DashboardComponent', () => {
     fixture.detectChanges();
     expect(component).toBeTruthy();
     expect(component.household()?.name).toBe('Mendoza Family');
+    expect(component.currenciesList()).toEqual(['PEN', 'USD']);
   });
 });

@@ -1,19 +1,20 @@
 import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from './core/services/auth.service';
 import { LoginComponent } from './features/login/login.component';
 import { DashboardComponent } from './features/dashboard/dashboard.component';
-import { inject } from '@angular/core';
-import { AuthService } from './core/services/auth.service';
-import { Router } from '@angular/router';
-import { map, take } from 'rxjs';
+import { HouseholdCreateComponent } from './features/household-create/household-create.component';
+import { HouseholdSettingsComponent } from './features/household-settings/household-settings.component';
+import { BudgetCreateComponent } from './features/budget-create/budget-create.component';
+import { BudgetDetailComponent } from './features/budget-detail/budget-detail.component';
+import { BudgetSettingsComponent } from './features/budget-settings/budget-settings.component';
 
-// Simple Auth Guard to protect the dashboard
-const authGuard = () => {
+export const authGuard = () => {
   const authService = inject(AuthService);
   const router = inject(Router);
 
-  // Access the signal directly
   const user = authService.user();
-
   if (user) return true;
 
   router.navigate(['/login']);
@@ -25,8 +26,33 @@ export const routes: Routes = [
   {
     path: 'dashboard',
     component: DashboardComponent,
-    canActivate: [authGuard] // Protect this route!
+    canActivate: [authGuard]
   },
-  { path: '', redirectTo: '/dashboard', pathMatch: 'full' }, // Default to dashboard
-  { path: '**', redirectTo: '/login' } // Fallback
+  {
+    path: 'households/new',
+    component: HouseholdCreateComponent,
+    canActivate: [authGuard]
+  },
+  {
+    path: 'settings/household',
+    component: HouseholdSettingsComponent,
+    canActivate: [authGuard]
+  },
+  {
+    path: 'budgets/new',
+    component: BudgetCreateComponent,
+    canActivate: [authGuard]
+  },
+  {
+    path: 'budgets/:id',
+    component: BudgetDetailComponent,
+    canActivate: [authGuard]
+  },
+  {
+    path: 'budgets/:id/settings',
+    component: BudgetSettingsComponent,
+    canActivate: [authGuard]
+  },
+  { path: '', redirectTo: '/dashboard', pathMatch: 'full' },
+  { path: '**', redirectTo: '/login' }
 ];

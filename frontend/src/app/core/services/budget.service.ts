@@ -1,14 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import {
+import type { Observable } from 'rxjs';
+import type {
   Budget,
   BudgetListResponse,
   CreateBudgetRequest,
   LiquiditySummary,
   UpdateBudgetRequest
 } from '../models/budget.model';
-import {
+import type {
   LedgerTransaction,
   LogTransactionRequest,
   TransferRequest,
@@ -21,8 +21,8 @@ import { environment } from '../../../environments/environments';
   providedIn: 'root'
 })
 export class BudgetService {
-  private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/v1/budgets`;
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${environment.apiUrl}/v1/budgets`;
 
   createBudget(request: CreateBudgetRequest): Observable<Budget> {
     return this.http.post<Budget>(this.baseUrl, request);
@@ -45,8 +45,16 @@ export class BudgetService {
     return this.http.get<Budget>(`${this.baseUrl}/${id}`);
   }
 
+  getBudget(id: string): Observable<Budget> {
+    return this.getBudgetById(id);
+  }
+
   updateBudget(id: string, request: UpdateBudgetRequest): Observable<Budget> {
     return this.http.patch<Budget>(`${this.baseUrl}/${id}`, request);
+  }
+
+  archiveBudget(id: string): Observable<Budget> {
+    return this.updateBudget(id, { status: 'ARCHIVED' });
   }
 
   logTransaction(budgetId: string, request: LogTransactionRequest): Observable<LedgerTransaction> {
@@ -74,4 +82,3 @@ export class BudgetService {
     return this.http.post<TransferResult>(`${this.baseUrl}/transfers`, request);
   }
 }
-

@@ -1,19 +1,17 @@
 import { Component, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { HouseholdService } from '../../core/services/household.service';
-import { CreateHouseholdRequest } from '../../core/models/household.model';
+import type { CreateHouseholdRequest } from '../../core/models/household.model';
 
 @Component({
   selector: 'app-household-create-dialog',
-  standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -22,17 +20,17 @@ import { CreateHouseholdRequest } from '../../core/models/household.model';
     MatCheckboxModule
   ],
   template: `
-    <h2 mat-dialog-title>CREATE YOUR HOUSEHOLD</h2>
+    <h2 mat-dialog-title>Create your household</h2>
     <mat-dialog-content>
       <p class="subtitle">Set up a shared space for joint budgeting and expenses.</p>
 
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Household Name</mat-label>
+        <mat-label>Household name</mat-label>
         <input matInput [(ngModel)]="name" name="hhName" placeholder="e.g. Mendoza Family" required />
       </mat-form-field>
 
       <div class="currency-group">
-        <label class="group-label">Base Currencies (Select all that apply):</label>
+        <label class="group-label">Base currencies (select all that apply):</label>
         <div class="checkbox-row">
           <mat-checkbox [(ngModel)]="currencies.PEN" name="pen">PEN (Peruvian Sol)</mat-checkbox>
           <mat-checkbox [(ngModel)]="currencies.USD" name="usd">USD (US Dollar)</mat-checkbox>
@@ -42,18 +40,18 @@ import { CreateHouseholdRequest } from '../../core/models/household.model';
       </div>
 
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Invite Partner as Co-Owner (Optional)</mat-label>
+        <mat-label>Invite partner as co-owner (optional)</mat-label>
         <input matInput type="email" [(ngModel)]="partnerEmail" name="pEmail" placeholder="partner@example.com" />
       </mat-form-field>
 
       @if (errorMessage()) {
-        <div class="error-banner">{{ errorMessage() }}</div>
+        <div class="error-banner" role="alert">{{ errorMessage() }}</div>
       }
     </mat-dialog-content>
 
     <mat-dialog-actions align="end">
       <button mat-flat-button color="primary" [disabled]="isSubmitting() || !name.trim() || selectedCurrencies().length === 0" (click)="submit()">
-        {{ isSubmitting() ? 'Creating...' : 'Create Household →' }}
+        {{ isSubmitting() ? 'Creating...' : 'Create household' }}
       </button>
     </mat-dialog-actions>
   `,
@@ -90,8 +88,8 @@ import { CreateHouseholdRequest } from '../../core/models/household.model';
   `]
 })
 export class HouseholdCreateDialogComponent {
-  private dialogRef = inject(MatDialogRef<HouseholdCreateDialogComponent>);
-  private householdService = inject(HouseholdService);
+  private readonly dialogRef = inject(MatDialogRef<HouseholdCreateDialogComponent>);
+  private readonly householdService = inject(HouseholdService);
 
   name = 'Mendoza Family';
   currencies = {
@@ -102,8 +100,8 @@ export class HouseholdCreateDialogComponent {
   };
   partnerEmail = '';
 
-  isSubmitting = signal(false);
-  errorMessage = signal<string | null>(null);
+  readonly isSubmitting = signal(false);
+  readonly errorMessage = signal<string | null>(null);
 
   selectedCurrencies(): string[] {
     const keys: (keyof typeof this.currencies)[] = ['PEN', 'USD', 'EUR', 'COP'];
@@ -120,7 +118,7 @@ export class HouseholdCreateDialogComponent {
     const request: CreateHouseholdRequest = {
       name: this.name.trim(),
       baseCurrencies,
-      partnerEmail: this.partnerEmail.trim() || undefined
+      partnerEmail: this.partnerEmail.trim() ? this.partnerEmail.trim() : undefined
     };
 
     this.householdService.createHousehold(request).subscribe({
@@ -128,9 +126,13 @@ export class HouseholdCreateDialogComponent {
         this.isSubmitting.set(false);
         this.dialogRef.close(hh);
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.isSubmitting.set(false);
-        this.errorMessage.set(err.error?.message || 'Failed to create household.');
+        if (err instanceof HttpErrorResponse) {
+          this.errorMessage.set(err.error?.message ?? err.message ?? 'Failed to create household.');
+        } else {
+          this.errorMessage.set('Failed to create household.');
+        }
       }
     });
   }

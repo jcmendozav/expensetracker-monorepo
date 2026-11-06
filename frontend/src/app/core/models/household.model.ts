@@ -28,6 +28,7 @@ export interface CreateHouseholdRequest {
 export interface UpdateHouseholdRequest {
   name?: string;
   baseCurrencies?: string[];
+  status?: string;
 }
 
 export interface HouseholdInvitation {

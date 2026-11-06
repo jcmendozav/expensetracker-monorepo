@@ -1,13 +1,13 @@
-import { Component, Inject, inject, signal } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { HttpErrorResponse } from '@angular/common/http';
 import { MAT_DIALOG_DATA, MatDialogRef, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
 import { BudgetService } from '../../core/services/budget.service';
-import { CreateBudgetRequest } from '../../core/models/budget.model';
+import type { CreateBudgetRequest } from '../../core/models/budget.model';
 
 export interface BudgetCreateDialogData {
   householdId: string;
@@ -16,9 +16,7 @@ export interface BudgetCreateDialogData {
 
 @Component({
   selector: 'app-budget-create-dialog',
-  standalone: true,
   imports: [
-    CommonModule,
     FormsModule,
     MatDialogModule,
     MatFormFieldModule,
@@ -27,16 +25,16 @@ export interface BudgetCreateDialogData {
     MatButtonModule
   ],
   template: `
-    <h2 mat-dialog-title>Create Budget</h2>
+    <h2 mat-dialog-title>Create budget</h2>
     <mat-dialog-content>
       <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Budget Title</mat-label>
+        <mat-label>Budget title</mat-label>
         <input matInput [(ngModel)]="title" name="budgetTitle" placeholder="e.g. Groceries & Market" required />
       </mat-form-field>
 
       <div class="row">
         <mat-form-field appearance="outline" class="amount-field">
-          <mat-label>Initial Capital Allocation</mat-label>
+          <mat-label>Initial capital allocation</mat-label>
           <input
             matInput
             type="number"
@@ -60,7 +58,7 @@ export interface BudgetCreateDialogData {
       </div>
 
       @if (errorMessage()) {
-        <div class="error-banner">{{ errorMessage() }}</div>
+        <div class="error-banner" role="alert">{{ errorMessage() }}</div>
       }
     </mat-dialog-content>
 
@@ -71,7 +69,7 @@ export interface BudgetCreateDialogData {
         color="primary"
         [disabled]="isSubmitting() || !title.trim() || !amount || amount <= 0"
         (click)="submit()">
-        {{ isSubmitting() ? 'Saving...' : 'Save Budget' }}
+        {{ isSubmitting() ? 'Saving...' : 'Save budget' }}
       </button>
     </mat-dialog-actions>
   `,
@@ -98,19 +96,20 @@ export interface BudgetCreateDialogData {
   `]
 })
 export class BudgetCreateDialogComponent {
-  private dialogRef = inject(MatDialogRef<BudgetCreateDialogComponent>);
-  private budgetService = inject(BudgetService);
+  readonly dialogRef = inject(MatDialogRef<BudgetCreateDialogComponent>);
+  readonly data: BudgetCreateDialogData = inject(MAT_DIALOG_DATA);
+  private readonly budgetService = inject(BudgetService);
 
   title = '';
   amount: number | null = null;
   currency = 'PEN';
 
-  isSubmitting = signal(false);
-  errorMessage = signal<string | null>(null);
+  readonly isSubmitting = signal(false);
+  readonly errorMessage = signal<string | null>(null);
 
-  constructor(@Inject(MAT_DIALOG_DATA) public data: BudgetCreateDialogData) {
-    if (data.availableCurrencies.length > 0) {
-      this.currency = data.availableCurrencies[0];
+  constructor() {
+    if (this.data?.availableCurrencies && this.data.availableCurrencies.length > 0) {
+      this.currency = this.data.availableCurrencies[0];
     }
   }
 
@@ -136,11 +135,14 @@ export class BudgetCreateDialogComponent {
         this.isSubmitting.set(false);
         this.dialogRef.close(b);
       },
-      error: (err) => {
+      error: (err: unknown) => {
         this.isSubmitting.set(false);
-        this.errorMessage.set(err.error?.message || 'Failed to create budget.');
+        if (err instanceof HttpErrorResponse) {
+          this.errorMessage.set(err.error?.message ?? err.message ?? 'Failed to create budget.');
+        } else {
+          this.errorMessage.set('Failed to create budget.');
+        }
       }
     });
   }
 }
-

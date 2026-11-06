@@ -6,15 +6,15 @@
       @for (inv of pendingInvitations(); track inv.id) {
         <div class="invitation-card">
           <div class="inv-details">
-            <span class="inv-icon">🏠</span>
+            <span class="inv-icon" aria-hidden="true">🏠</span>
             <div>
-              <strong>Household Invitation</strong>
+              <strong>Household invitation</strong>
               <p>{{ inv.inviterName }} invited you to join "<strong>{{ inv.householdName }}</strong>" as Co-Owner.</p>
             </div>
           </div>
           <div class="inv-actions">
-            <button mat-flat-button color="primary" (click)="acceptInvitation(inv.id)">✅ Accept</button>
-            <button mat-stroked-button color="warn" (click)="declineInvitation(inv.id)">❌ Decline</button>
+            <button mat-flat-button color="primary" type="button" (click)="acceptInvitation(inv.id)">Accept</button>
+            <button mat-stroked-button color="warn" type="button" (click)="declineInvitation(inv.id)">Decline</button>
           </div>
         </div>
       }
@@ -29,31 +29,36 @@
   } @else if (!household()) {
     <!-- ── 3. Onboarding Prompt (No Active Household) ── -->
     <div class="onboarding-card">
-      <span class="house-icon">🏡</span>
+      <span class="house-icon" aria-hidden="true">🏡</span>
       <h2>Welcome to ExpenseTracker</h2>
       <p>Create or join a household to share multi-budget liquidity with your partner.</p>
-      <button mat-flat-button color="primary" class="onboard-btn" (click)="openHouseholdOnboarding()">
-        + Set Up Household
-      </button>
+      <a mat-flat-button color="primary" class="onboard-btn" routerLink="/households/new">
+        + Set up household
+      </a>
     </div>
   } @else {
     <!-- ── 4. Main Household Dashboard ── -->
     <header class="dashboard-header">
       <div class="household-meta">
-        <h1 class="household-title">🏡 {{ household()?.name }}</h1>
+        <h1 class="household-title">
+          🏡 {{ household()?.name }}
+          <a mat-icon-button routerLink="/settings/household" aria-label="Household settings" class="settings-link">
+            ⚙️
+          </a>
+        </h1>
         <span class="members-tag">
-          Members: {{ household()?.memberIds?.length || 1 }} Active
+          Members: {{ household()?.memberIds?.length ?? 1 }} Active
         </span>
       </div>
 
       <div class="header-controls">
-        <button mat-stroked-button class="transfer-btn" (click)="openTransfer()">
-          ⇄ Transfer Funds
+        <button mat-stroked-button class="transfer-btn" type="button" (click)="openTransfer()">
+          ⇄ Transfer funds
         </button>
-        <button mat-flat-button color="primary" class="new-budget-btn" (click)="openCreateBudget()">
-          + New Budget
+        <button mat-flat-button color="primary" class="new-budget-btn" type="button" (click)="openCreateBudget()">
+          + New budget
         </button>
-        <button mat-icon-button class="bell-btn" (click)="toggleActivityDrawer()" aria-label="View notifications">
+        <button mat-icon-button class="bell-btn" type="button" (click)="toggleActivityDrawer()" aria-label="View notifications">
           <span [matBadge]="unreadCount()" [matBadgeHidden]="unreadCount() === 0" matBadgeColor="warn" matBadgeSize="small">
             🔔
           </span>
@@ -68,15 +73,15 @@
       </mat-card-header>
       <mat-card-content>
         <div class="liquidity-balances">
-          @for (curr of getCurrenciesList(); track curr) {
+          @for (curr of currenciesList(); track curr) {
             <div class="currency-pill">
               <span class="curr-code">{{ curr }}</span>
-              <span class="curr-amount">{{ formatCurrency(summary()?.balancesByCurrency?.[curr] || 0, curr) }}</span>
+              <span class="curr-amount">{{ formatCurrency(summary()?.balancesByCurrency?.[curr] ?? 0, curr) }}</span>
             </div>
           }
         </div>
         <div class="liquidity-footer">
-          <span>{{ summary()?.activeCount || 0 }} Active Budgets</span>
+          <span>{{ summary()?.activeCount ?? 0 }} Active Budgets</span>
           <span>• 1-Step Inter-Budget Transfers Available</span>
         </div>
       </mat-card-content>
@@ -91,7 +96,7 @@
       @if (budgets().length === 0) {
         <div class="empty-budgets">
           <p>No active budgets found in this household.</p>
-          <button mat-stroked-button (click)="openCreateBudget()">Create First Budget</button>
+          <button mat-stroked-button type="button" (click)="openCreateBudget()">Create first budget</button>
         </div>
       } @else {
         <div class="budgets-grid">
@@ -106,15 +111,25 @@
               <mat-card-header>
                 <div class="budget-card-header">
                   <span class="budget-title">{{ budget.title }}</span>
-                  <mat-chip-set>
-                    @if (budget.status === 'LOW_BALANCE') {
-                      <mat-chip class="chip-warn">⚠️ Low</mat-chip>
-                    } @else if (budget.status === 'DEPLETED') {
-                      <mat-chip class="chip-danger">Depleted</mat-chip>
-                    } @else {
-                      <mat-chip class="chip-healthy">Healthy</mat-chip>
-                    }
-                  </mat-chip-set>
+                  <div class="budget-header-actions">
+                    <mat-chip-set>
+                      @if (budget.status === 'LOW_BALANCE') {
+                        <mat-chip class="chip-warn">⚠️ Low</mat-chip>
+                      } @else if (budget.status === 'DEPLETED') {
+                        <mat-chip class="chip-danger">Depleted</mat-chip>
+                      } @else {
+                        <mat-chip class="chip-healthy">Healthy</mat-chip>
+                      }
+                    </mat-chip-set>
+                    <a
+                      mat-icon-button
+                      [routerLink]="['/budgets', budget.id]"
+                      (click)="$event.stopPropagation()"
+                      aria-label="View budget details"
+                      class="view-link">
+                      ↗
+                    </a>
+                  </div>
                 </div>
               </mat-card-header>
 
@@ -160,16 +175,16 @@
                   <th>Date</th>
                   <th>Type</th>
                   <th>Category / Note</th>
-                  <th>Logged By</th>
+                  <th>Logged by</th>
                   <th>Amount</th>
-                  <th>Balance After</th>
+                  <th>Balance after</th>
                   <th>Status</th>
                   <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 @for (tx of selectedBudgetLedger(); track tx.id) {
-                  <tr [class.voided-row]="tx.status === 'VOIDED'">
+                  <tr [class.voided-row]="tx.status === 'VOIDED'" (click)="openEditSheet(tx)">
                     <td>{{ tx.transactionDate | date:'shortDate' }} {{ tx.transactionDate | date:'shortTime' }}</td>
                     <td>
                       <span class="tx-type-tag" [class.type-spending]="tx.type === 'SPENDING'" [class.type-income]="tx.type === 'INCOME'">
@@ -182,22 +197,24 @@
                         <div class="tx-note">{{ tx.note }}</div>
                       }
                     </td>
-                    <td>{{ tx.createdByName || 'User' }}</td>
+                    <td>{{ tx.createdByName }}</td>
                     <td class="amount-cell" [class.neg]="tx.type === 'SPENDING' || tx.type === 'TRANSFER_OUT'" [class.pos]="tx.type === 'INCOME' || tx.type === 'TRANSFER_IN'">
-                      {{ tx.type === 'SPENDING' || tx.type === 'TRANSFER_OUT' ? '-' : '+' }}{{ tx.amountCents / 100 | number:'1.2-2' }}
+                      {{ tx.type === 'SPENDING' || tx.type === 'TRANSFER_OUT' ? '-' : '+' }}{{ (tx.amountCents / 100) | number:'1.2-2' }}
                     </td>
-                    <td>{{ tx.balanceAfterCents / 100 | number:'1.2-2' }}</td>
+                    <td>{{ (tx.balanceAfterCents / 100) | number:'1.2-2' }}</td>
                     <td>
                       <span class="status-badge" [class.status-void]="tx.status === 'VOIDED'">
                         {{ tx.status }}
                       </span>
                     </td>
                     <td>
-                      @if (tx.status === 'COMMITTED') {
-                        <button mat-button class="void-btn" (click)="voidTransaction(selectedBudgetId()!, tx.id)">
-                          Void
-                        </button>
-                      }
+                      <button
+                        mat-button
+                        class="edit-btn"
+                        type="button"
+                        (click)="$event.stopPropagation(); openEditSheet(tx)">
+                        Edit
+                      </button>
                     </td>
                   </tr>
                 }
@@ -214,7 +231,7 @@
       color="primary"
       class="fab-log-btn"
       (click)="openExpenseEntry()"
-      aria-label="Log expense in 3 taps">
+      aria-label="Log transaction in 3 taps">
       +
     </button>
   }
@@ -225,6 +242,7 @@
       <div class="drawer-container" (click)="$event.stopPropagation()">
         <app-activity-drawer
           [notifications]="notifications()"
+          [invitations]="pendingInvitations()"
           (close)="toggleActivityDrawer()"
           (refreshed)="loadAll()">
         </app-activity-drawer>

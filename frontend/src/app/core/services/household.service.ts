@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import {
+import { HttpClient } from '@angular/common/http';
+import type { Observable } from 'rxjs';
+import type {
   CreateHouseholdRequest,
   Household,
   HouseholdInvitation,
@@ -14,8 +14,8 @@ import { environment } from '../../../environments/environments';
   providedIn: 'root'
 })
 export class HouseholdService {
-  private http = inject(HttpClient);
-  private baseUrl = `${environment.apiUrl}/v1`;
+  private readonly http = inject(HttpClient);
+  private readonly baseUrl = `${environment.apiUrl}/v1`;
 
   getCurrentHousehold(): Observable<Household> {
     return this.http.get<Household>(`${this.baseUrl}/households/current`);
@@ -33,6 +33,10 @@ export class HouseholdService {
     return this.http.patch<Household>(`${this.baseUrl}/households/${id}`, request);
   }
 
+  archiveHousehold(id: string): Observable<Household> {
+    return this.updateHousehold(id, { status: 'ARCHIVED' });
+  }
+
   inviteCoOwner(householdId: string, request: InviteCoOwnerRequest): Observable<HouseholdInvitation> {
     return this.http.post<HouseholdInvitation>(`${this.baseUrl}/households/${householdId}/invitations`, request);
   }
@@ -45,23 +49,15 @@ export class HouseholdService {
     return this.http.delete<void>(`${this.baseUrl}/households/${householdId}/invitations/${invitationId}`);
   }
 
-  getPendingInvitations(email?: string): Observable<HouseholdInvitation[]> {
-    let params = new HttpParams();
-    if (email) {
-      params = params.set('email', email);
-    }
-    return this.http.get<HouseholdInvitation[]>(`${this.baseUrl}/invitations/pending`, { params });
+  getPendingInvitations(): Observable<HouseholdInvitation[]> {
+    return this.http.get<HouseholdInvitation[]>(`${this.baseUrl}/invitations/pending`);
   }
 
-  acceptInvitation(invitationId: string, email?: string, displayName?: string): Observable<Household> {
-    let params = new HttpParams();
-    if (email) params = params.set('email', email);
-    if (displayName) params = params.set('displayName', displayName);
-    return this.http.post<Household>(`${this.baseUrl}/invitations/${invitationId}/accept`, null, { params });
+  acceptInvitation(invitationId: string): Observable<Household> {
+    return this.http.post<Household>(`${this.baseUrl}/invitations/${invitationId}/accept`, null);
   }
 
   declineInvitation(invitationId: string): Observable<{ id: string; status: string }> {
     return this.http.post<{ id: string; status: string }>(`${this.baseUrl}/invitations/${invitationId}/decline`, null);
   }
 }
-
