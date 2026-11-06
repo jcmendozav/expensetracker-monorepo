@@ -110,11 +110,25 @@ expensetracker-monorepo/
 │   ├── src/                  # Components, Services, Guards, Environments
 │   └── angular.json          # Build configurations
 ├── docs/
-│   ├── designs/              # Active design docs
-│   └── archive/              # Completed feature designs
+│   ├── designs/              # Active feature design docs
+│   └── archive/              # Completed & archived feature designs
+│       └── household_multi_budget_ledger.md  # Household Multi-Budget & Distributed Ledger
 ├── setup-gcp.sh              # One-time GCP bootstrap script
 ├── deploy.sh                 # Cloud Run & Firebase Hosting deployment script
 ├── undeploy.sh               # Teardown script (leaves database safe)
 ├── firebase.json             # Firebase Hosting SPA routing config
 └── AGENTS.md                 # Developer & AI Agent workflow guidelines
 ```
+
+---
+
+## 🏛️ Household Multi-Budget & Distributed Ledger
+
+The monorepo implements a full-stack household multi-budget ledger architecture with real-time multi-currency liquidity tracking:
+- **Distributed Atomic Ledger**: Sub-cent rounding prevention with integer minor currency units (`cents: long`), atomic multi-document writes via Firestore transactions/batches, and soft-void refund traceability.
+- **Cross-Currency Transfers**: Inter-budget liquidity transfers with floating or custom exchange rates (FX).
+- **In-App Co-Owner Invitations**: Secure server-side identity verification and atomic membership provisioning.
+- **Decoupled Activity & TTL Notifications**: Asynchronous Spring event listeners with 90-day TTL Firestore documents.
+- **Modern Angular Frontend**: Modern Angular architecture strictly adhering to Signals (`input()`, `output()`, `computed()`), `readonly` dependency injection with `inject()`, sub-3-tap expense entry, and WCAG AA accessibility.
+
+See [docs/archive/household_multi_budget_ledger.md](docs/archive/household_multi_budget_ledger.md) for the design and specification.

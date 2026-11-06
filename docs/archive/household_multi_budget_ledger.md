@@ -829,6 +829,6 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 
 #### Phase 7: Full Monorepo Verification & Lifecycle Archival
 
-* [ ] **7.1 Full Monorepo Build Check:** Execute `cd backend && ./gradlew build -x test && cd ../frontend && npm run build`.
-* [ ] **7.2 Full Test Suite:** Execute all backend and frontend unit/integration test suites.
-* [ ] **7.3 Lifecycle Archival:** Move `household_multi_budget_ledger.md` to `docs/archive/` and update `README.md`.
+* [x] **7.1 Full Monorepo Build Check:** Execute `cd backend && ./gradlew build -x test && cd ../frontend && npm run build`.
+* [x] **7.2 Full Test Suite:** Execute all backend and frontend unit/integration test suites.
+* [x] **7.3 Lifecycle Archival:** Move `household_multi_budget_ledger.md` to `docs/archive/` and update `README.md`.
