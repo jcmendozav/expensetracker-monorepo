@@ -103,8 +103,8 @@ stateDiagram-v2
 
 ### 3.1 Ledger Auditing & Mutation Strategy (Hybrid Model)
 
-* **Non-Financial Edits (`PATCH /transactions/{id}`):** Changes to `note`, `category`, and `receiptUrl` update the document in place without altering balances.
-* **Financial / Amount Corrections (`POST /transactions/{id}/void` & Re-issue):**
+* **Non-Financial Edits (`PATCH /api/v1/budgets/{budgetId}/transactions/{txId}`):** Changes to `note`, `category`, and `receiptUrl` update the document in place without altering balances.
+* **Financial / Amount Corrections (`POST /api/v1/budgets/{budgetId}/transactions/{txId}/void` & Re-issue):**
   * To preserve mathematical ledger integrity, modifying amounts marks the original record as `status = VOIDED`, atomically refunds the amount to `budget.currentBalanceCents`, and appends a new corrected transaction with a fresh snapshot balance (`balanceAfterCents`).
 
 ### 3.2 Cross-Currency Transfers with Manual Exchange Rates
@@ -141,7 +141,7 @@ sequenceDiagram
     Client->>Controller: POST /api/v1/budgets/{id}/transactions
     Controller->>Service: commitTransaction(dto)
     Service->>Service: Atomic commit (Budget + Transaction)
-    Service->>Publisher: publish(BudgetBalanceChangedEvent)
+    Service->>Publisher: publish(TransactionCreatedEvent)
     Service-->>Controller: Return TransactionDto (201 Created)
     Controller-->>Client: HTTP 201 Created (Instant UI Response)
     
@@ -525,6 +525,7 @@ Household (Collection: households/{householdId}):
   status: "ONBOARDING" | "ACTIVE" | "FROZEN" | "ARCHIVED"
   baseCurrencies: string[] # ["PEN", "USD"]
   balancesByCurrency: Map<string, long> # Pre-calculated snapshot: { "PEN": 1420000, "USD": 85000 }
+  activeBudgetCount: int # Cached active count for 1-document summary read (§3.6)
   ownerId: string # Primary Creator UID
   members:
     "usr_carlos_123": { role: "PRIMARY_OWNER", displayName: "Carlos", email: "carlos@example.com", status: "ACTIVE" }
@@ -606,17 +607,21 @@ HouseholdInvitation (Collection: householdInvitations/{invitationId}):
 | :--- | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/households` | Create Household | `{ name: string, baseCurrencies: string[], partnerEmail?: string }` | `201 Created` $\to$ `HouseholdDto` |
 | `GET` | `/api/v1/households/current` | Get Active Household | *None* | `200 OK` $\to$ `HouseholdDto` |
+| `GET` | `/api/v1/households/{id}` | Get Household Details | *None* | `200 OK` $\to$ `HouseholdDto` |
 | `PATCH` | `/api/v1/households/{id}` | Update Household Settings | `{ name?: string, baseCurrencies?: string[] }` | `200 OK` $\to$ `HouseholdDto` |
 | `POST` | `/api/v1/households/{id}/invitations` | Invite Co-Owner by Email | `{ invitedEmail: string }` | `201 Created` $\to$ `HouseholdInvitationDto` |
+| `GET` | `/api/v1/households/{id}/invitations` | List Household Invitations | *None* | `200 OK` $\to$ `HouseholdInvitationDto[]` |
 | `GET` | `/api/v1/invitations/pending` | List Pending Invitations for Signed-In User | *None* | `200 OK` $\to$ `HouseholdInvitationDto[]` |
 | `POST` | `/api/v1/invitations/{id}/accept` | Accept Household Invitation | *None* | `200 OK` $\to$ `HouseholdDto` |
 | `POST` | `/api/v1/invitations/{id}/decline` | Decline Household Invitation | *None* | `200 OK` $\to$ `{ id: string, status: "DECLINED" }` |
 | `DELETE` | `/api/v1/households/{id}/invitations/{invitationId}` | Cancel Pending Invitation (Owner only) | *None* | `204 No Content` |
 | `POST` | `/api/v1/budgets` | Create Budget | `{ householdId: string, title: string, initialAmountCents: long, currency: string }` | `201 Created` $\to$ `BudgetDto` |
 | `GET` | `/api/v1/budgets` | List Budgets | *Query:* `?householdId=...&status=ACTIVE` | `200 OK` $\to$ `{ items: BudgetDto[], nextCursor: string }` |
+| `GET` | `/api/v1/budgets/{id}` | Get Budget by ID | *None* | `200 OK` $\to$ `BudgetDto` |
 | `PATCH` | `/api/v1/budgets/{id}` | Update Budget Settings | `{ title?: string, initialAmountCents?: long, status?: string }` | `200 OK` $\to$ `BudgetDto` |
 | `GET` | `/api/v1/budgets/summary` | Consolidated Liquidity | *Query:* `?householdId=...` | `200 OK` $\to$ `{ balancesByCurrency: { [curr]: long }, activeCount: int }` |
 | `POST` | `/api/v1/budgets/{id}/transactions` | Log Expense / Top-Up | `{ type: "SPENDING"\|"INCOME", amountCents: long, category: string, note?: string, transactionDate: string }` | `201 Created` $\to$ `TransactionDto` |
+| `GET` | `/api/v1/budgets/{id}/transactions` | List Ledger Transactions | *Query:* `?limit=50` | `200 OK` $\to$ `TransactionDto[]` |
 | `PATCH` | `/api/v1/budgets/{id}/transactions/{txId}` | Update Metadata (Note/Category) | `{ category?: string, note?: string }` | `200 OK` $\to$ `TransactionDto` |
 | `POST` | `/api/v1/budgets/{id}/transactions/{txId}/void` | Void & Refund Transaction | *None* | `200 OK` $\to$ `TransactionDto` |
 | `POST` | `/api/v1/budgets/transfers` | 1-Step Atomic Transfer (with optional FX) | `{ sourceBudgetId: string, targetBudgetId: string, sourceAmountCents: long, exchangeRate?: double, note?: string }` | `200 OK` $\to$ `TransferResultDto` |
