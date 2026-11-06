@@ -17,10 +17,12 @@ import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.Firestore;
 import com.google.cloud.firestore.QueryDocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
+import com.google.cloud.firestore.WriteBatch;
 import com.house.expensetracker.dto.HouseholdDto;
 import com.house.expensetracker.dto.HouseholdInvitationDto;
 import com.house.expensetracker.dto.InviteCoOwnerRequest;
 import com.house.expensetracker.exception.BadRequestException;
+import com.house.expensetracker.exception.ForbiddenException;
 import com.house.expensetracker.exception.ResourceNotFoundException;
 import com.house.expensetracker.model.Household;
 import com.house.expensetracker.model.HouseholdInvitation;
@@ -30,6 +32,7 @@ import com.house.expensetracker.model.HouseholdMember;
 public class HouseholdInvitationService {
 
     public static final String COLLECTION_NAME = "householdInvitations";
+    public static final long INVITATION_TTL_SECONDS = 7L * 24 * 60 * 60; // 7 days
 
     private final Firestore firestore;
     private final HouseholdService householdService;
@@ -42,6 +45,14 @@ public class HouseholdInvitationService {
 
     private CollectionReference getCollection() {
         return firestore.collection(COLLECTION_NAME);
+    }
+
+    public boolean isExpired(HouseholdInvitation invitation) {
+        if (invitation == null || invitation.getCreatedAt() == null) {
+            return false;
+        }
+        long ageSeconds = Timestamp.now().getSeconds() - invitation.getCreatedAt().getSeconds();
+        return ageSeconds > INVITATION_TTL_SECONDS;
     }
 
     public HouseholdInvitationDto createInvitation(
@@ -110,7 +121,12 @@ public class HouseholdInvitationService {
                     .get().get();
 
             for (QueryDocumentSnapshot doc : snapshot.getDocuments()) {
-                list.add(toDto(fromSnapshot(doc)));
+                HouseholdInvitation inv = fromSnapshot(doc);
+                if (isExpired(inv)) {
+                    getCollection().document(inv.getId()).update("status", "EXPIRED", "updatedAt", Timestamp.now());
+                } else {
+                    list.add(toDto(inv));
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -159,54 +175,65 @@ public class HouseholdInvitationService {
             throw new BadRequestException("Invitation is no longer pending (current status: " + invitation.getStatus() + ")");
         }
 
+        if (isExpired(invitation)) {
+            getCollection().document(invitationId).update("status", "EXPIRED", "updatedAt", Timestamp.now());
+            throw new BadRequestException("Invitation has expired");
+        }
+
+        if (callerEmail != null && !callerEmail.isBlank()) {
+            if (!invitation.getInvitedEmail().equalsIgnoreCase(callerEmail.trim())) {
+                throw new ForbiddenException("Invitation was sent to a different email address: " + invitation.getInvitedEmail());
+            }
+        }
+
         Timestamp now = Timestamp.now();
         invitation.setStatus("ACCEPTED");
         invitation.setUpdatedAt(now);
 
+        Household household = householdService.getHouseholdEntity(invitation.getHouseholdId());
+        List<String> memberIds = household.getMemberIds() != null
+                ? new ArrayList<>(household.getMemberIds())
+                : new ArrayList<>();
+        if (!memberIds.contains(callerUid)) {
+            memberIds.add(callerUid);
+        }
+        household.setMemberIds(memberIds);
+
+        Map<String, HouseholdMember> members = household.getMembers() != null
+                ? new HashMap<>(household.getMembers())
+                : new HashMap<>();
+
+        HouseholdMember newMember = HouseholdMember.builder()
+                .userId(callerUid)
+                .role("CO_OWNER")
+                .displayName(callerName != null && !callerName.isBlank() ? callerName : "Co-Owner")
+                .email(callerEmail != null ? callerEmail.toLowerCase().trim() : invitation.getInvitedEmail())
+                .status("ACTIVE")
+                .build();
+        members.put(callerUid, newMember);
+        household.setMembers(members);
+        household.setUpdatedAt(now);
+
+        Map<String, Object> membersMap = new HashMap<>();
+        members.forEach((k, v) -> {
+            Map<String, Object> m = new HashMap<>();
+            m.put("userId", v.getUserId());
+            m.put("role", v.getRole());
+            m.put("displayName", v.getDisplayName());
+            m.put("email", v.getEmail());
+            m.put("status", v.getStatus());
+            membersMap.put(k, m);
+        });
+
         try {
-            // 1. Mark invitation accepted
-            getCollection().document(invitationId).update("status", "ACCEPTED", "updatedAt", now).get();
-
-            // 2. Add caller to household members
-            Household household = householdService.getHouseholdEntity(invitation.getHouseholdId());
-            List<String> memberIds = household.getMemberIds() != null
-                    ? new ArrayList<>(household.getMemberIds())
-                    : new ArrayList<>();
-            if (!memberIds.contains(callerUid)) {
-                memberIds.add(callerUid);
-            }
-            household.setMemberIds(memberIds);
-
-            Map<String, HouseholdMember> members = household.getMembers() != null
-                    ? new HashMap<>(household.getMembers())
-                    : new HashMap<>();
-
-            HouseholdMember newMember = HouseholdMember.builder()
-                    .userId(callerUid)
-                    .role("CO_OWNER")
-                    .displayName(callerName != null && !callerName.isBlank() ? callerName : "Co-Owner")
-                    .email(callerEmail != null ? callerEmail.toLowerCase().trim() : invitation.getInvitedEmail())
-                    .status("ACTIVE")
-                    .build();
-            members.put(callerUid, newMember);
-            household.setMembers(members);
-            household.setUpdatedAt(now);
-
-            // Update in Firestore
+            WriteBatch batch = firestore.batch();
+            DocumentReference invDocRef = getCollection().document(invitationId);
             DocumentReference hhDocRef = firestore.collection(HouseholdService.COLLECTION_NAME).document(household.getId());
-            Map<String, Object> membersMap = new HashMap<>();
-            members.forEach((k, v) -> {
-                Map<String, Object> m = new HashMap<>();
-                m.put("userId", v.getUserId());
-                m.put("role", v.getRole());
-                m.put("displayName", v.getDisplayName());
-                m.put("email", v.getEmail());
-                m.put("status", v.getStatus());
-                membersMap.put(k, m);
-            });
 
-            hhDocRef.update("memberIds", memberIds, "members", membersMap, "updatedAt", now).get();
+            batch.update(invDocRef, "status", "ACCEPTED", "updatedAt", now);
+            batch.update(hhDocRef, "memberIds", memberIds, "members", membersMap, "updatedAt", now);
 
+            batch.commit().get();
             return householdService.toDto(household);
 
         } catch (InterruptedException e) {
@@ -217,10 +244,16 @@ public class HouseholdInvitationService {
         }
     }
 
-    public Map<String, Object> declineInvitation(String invitationId, String callerUid) {
+    public Map<String, Object> declineInvitation(String invitationId, String callerUid, String callerEmail) {
         HouseholdInvitation invitation = getInvitationEntity(invitationId);
         if (!"PENDING".equalsIgnoreCase(invitation.getStatus())) {
             throw new BadRequestException("Invitation is not pending");
+        }
+
+        if (callerEmail != null && !callerEmail.isBlank()) {
+            if (!invitation.getInvitedEmail().equalsIgnoreCase(callerEmail.trim())) {
+                throw new ForbiddenException("Invitation was sent to a different email address");
+            }
         }
 
         Timestamp now = Timestamp.now();
@@ -244,7 +277,7 @@ public class HouseholdInvitationService {
 
     public void cancelInvitation(String householdId, String invitationId, String callerUid) {
         Household household = householdService.getHouseholdEntity(householdId);
-        householdService.assertMembership(household, callerUid);
+        householdService.assertOwner(household, callerUid);
 
         HouseholdInvitation invitation = getInvitationEntity(invitationId);
         if (!householdId.equals(invitation.getHouseholdId())) {
@@ -260,6 +293,11 @@ public class HouseholdInvitationService {
         } catch (ExecutionException e) {
             throw new RuntimeException("Failed to cancel invitation: " + e.getMessage(), e);
         }
+    }
+
+    public void cancelInvitationById(String invitationId, String callerUid) {
+        HouseholdInvitation invitation = getInvitationEntity(invitationId);
+        cancelInvitation(invitation.getHouseholdId(), invitationId, callerUid);
     }
 
     public HouseholdInvitation getInvitationEntity(String invitationId) {
@@ -302,7 +340,7 @@ public class HouseholdInvitationService {
                 .build();
     }
 
-    private Map<String, Object> toFirestoreMap(HouseholdInvitation inv) {
+    public Map<String, Object> toFirestoreMap(HouseholdInvitation inv) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", inv.getId());
         map.put("householdId", inv.getHouseholdId());
@@ -317,7 +355,7 @@ public class HouseholdInvitationService {
         return map;
     }
 
-    private HouseholdInvitation fromSnapshot(DocumentSnapshot doc) {
+    public HouseholdInvitation fromSnapshot(DocumentSnapshot doc) {
         HouseholdInvitation inv = new HouseholdInvitation();
         inv.setId(doc.getId());
         inv.setHouseholdId(doc.getString("householdId"));
@@ -332,4 +370,3 @@ public class HouseholdInvitationService {
         return inv;
     }
 }
-

@@ -10,11 +10,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.house.expensetracker.dto.HouseholdDto;
 import com.house.expensetracker.dto.HouseholdInvitationDto;
+import com.house.expensetracker.security.AuthenticatedUser;
 import com.house.expensetracker.service.HouseholdInvitationService;
 
 @RestController
@@ -29,21 +29,22 @@ public class InvitationController {
     }
 
     @GetMapping("/pending")
-    public ResponseEntity<List<HouseholdInvitationDto>> getPendingInvitations(
-            @RequestParam(value = "email", required = false) String email,
-            Principal principal) {
-        List<HouseholdInvitationDto> list = invitationService.getPendingInvitationsForEmail(email);
+    public ResponseEntity<List<HouseholdInvitationDto>> getPendingInvitations(Principal principal) {
+        AuthenticatedUser caller = AuthenticatedUser.from(principal);
+        List<HouseholdInvitationDto> list = invitationService.getPendingInvitationsForEmail(caller.email());
         return ResponseEntity.ok(list);
     }
 
     @PostMapping("/{id}/accept")
     public ResponseEntity<HouseholdDto> acceptInvitation(
             @PathVariable("id") String id,
-            @RequestParam(value = "email", required = false) String email,
-            @RequestParam(value = "displayName", required = false) String displayName,
             Principal principal) {
-        String callerUid = principal.getName();
-        HouseholdDto accepted = invitationService.acceptInvitation(id, callerUid, email, displayName);
+        AuthenticatedUser caller = AuthenticatedUser.from(principal);
+        HouseholdDto accepted = invitationService.acceptInvitation(
+                id,
+                caller.uid(),
+                caller.email(),
+                caller.displayName());
         return ResponseEntity.ok(accepted);
     }
 
@@ -51,9 +52,17 @@ public class InvitationController {
     public ResponseEntity<Map<String, Object>> declineInvitation(
             @PathVariable("id") String id,
             Principal principal) {
-        String callerUid = principal.getName();
-        Map<String, Object> result = invitationService.declineInvitation(id, callerUid);
+        AuthenticatedUser caller = AuthenticatedUser.from(principal);
+        Map<String, Object> result = invitationService.declineInvitation(id, caller.uid(), caller.email());
         return ResponseEntity.ok(result);
     }
-}
 
+    @PostMapping("/{id}/cancel")
+    public ResponseEntity<Map<String, Object>> cancelInvitation(
+            @PathVariable("id") String id,
+            Principal principal) {
+        AuthenticatedUser caller = AuthenticatedUser.from(principal);
+        invitationService.cancelInvitationById(id, caller.uid());
+        return ResponseEntity.ok(Map.of("id", id, "status", "CANCELLED"));
+    }
+}

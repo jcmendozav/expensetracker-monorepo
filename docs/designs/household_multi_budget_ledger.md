@@ -806,9 +806,9 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 #### Phase 4: In-App Household Invitations
 
 * [x] **4.1 Invitation DTOs & State Machine:** Define `InviteCoOwnerRequest`, `HouseholdInvitationDto`, and normalize emails to lowercase.
-* [ ] **4.2 Invitation Service & Atomic Member Mutation:** Implement invite creation, pending lookup strictly by server-side authenticated email, atomic accept (updating invitation + household `members`/`memberIds` inside a transaction), decline, and Owner-only cancel. Add `HouseholdInvitationServiceTest`.
-* [ ] **4.3 Invitation Controller Endpoints:** Implement `/api/v1/households/{id}/invitations` and `/api/v1/invitations/...` extracting caller identity (`uid`, `email`, `displayName`) from the security context. Update slice tests.
-* [ ] **4.4 Phase 4 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+* [x] **4.2 Invitation Service & Atomic Member Mutation:** Implement invite creation, pending lookup strictly by server-side authenticated email, atomic accept (updating invitation + household `members`/`memberIds` inside a transaction), decline, and Owner-only cancel. Add `HouseholdInvitationServiceTest`.
+* [x] **4.3 Invitation Controller Endpoints:** Implement `/api/v1/households/{id}/invitations` and `/api/v1/invitations/...` extracting caller identity (`uid`, `email`, `displayName`) from the security context. Update slice tests.
+* [x] **4.4 Phase 4 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 5: Decoupled Activity Alerts & TTL
 

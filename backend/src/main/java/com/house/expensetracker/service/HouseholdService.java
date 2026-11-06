@@ -186,6 +186,13 @@ public class HouseholdService {
         }
     }
 
+    public void assertOwner(Household household, String callerUid) {
+        assertMembership(household, callerUid);
+        if (!callerUid.equals(household.getOwnerId())) {
+            throw new ForbiddenException("Only the Primary Owner can perform this action");
+        }
+    }
+
     public HouseholdDto toDto(Household entity) {
         if (entity == null) {
             return null;
