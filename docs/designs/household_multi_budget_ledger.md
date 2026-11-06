@@ -799,9 +799,9 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 #### Phase 3: Transactions, Atomic Ledger & Transfers
 
 * [x] **3.1 Transaction DTOs & Invariants:** Define `LogTransactionRequest`, `TransactionDto`, `TransferRequest`, and `TransferResultDto` strictly using `long amountCents`.
-* [ ] **3.2 Transaction Service & Atomic Multi-Document Mutations:** Refactor `TransactionService` (removing duplicate `LedgerService`) so `commitTransaction`, `voidTransaction` (idempotent soft-void with refund), and `transferFunds` (inter-budget with FX `Math.round`) execute atomically via `Firestore.runTransaction(...)` / `WriteBatch` and record authenticated `createdByName`. Populate `TransactionServiceTest`.
-* [ ] **3.3 Transaction Controller & Slice Tests:** Move `/api/v1/budgets/{id}/transactions`, `/api/v1/budgets/{id}/transactions/{txId}`, `/api/v1/budgets/{id}/transactions/{txId}/void`, and `/api/v1/budgets/transfers` into `TransactionController` (keeping `BudgetController` focused strictly on `/api/v1/budgets`). Verify with `TransactionControllerTest`.
-* [ ] **3.4 Phase 3 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+* [x] **3.2 Transaction Service & Atomic Multi-Document Mutations:** Refactor `TransactionService` (removing duplicate `LedgerService`) so `commitTransaction`, `voidTransaction` (idempotent soft-void with refund), and `transferFunds` (inter-budget with FX `Math.round`) execute atomically via `Firestore.runTransaction(...)` / `WriteBatch` and record authenticated `createdByName`. Populate `TransactionServiceTest`.
+* [x] **3.3 Transaction Controller & Slice Tests:** Move `/api/v1/budgets/{id}/transactions`, `/api/v1/budgets/{id}/transactions/{txId}`, `/api/v1/budgets/{id}/transactions/{txId}/void`, and `/api/v1/budgets/transfers` into `TransactionController` (keeping `BudgetController` focused strictly on `/api/v1/budgets`). Verify with `TransactionControllerTest`.
+* [x] **3.4 Phase 3 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 4: In-App Household Invitations
 
