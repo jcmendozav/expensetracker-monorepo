@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.house.expensetracker.dto.NotificationFeedResponse;
+import com.house.expensetracker.security.AuthenticatedUser;
 import com.house.expensetracker.service.NotificationService;
 
 @RestController
@@ -32,8 +33,8 @@ public class NotificationController {
             @RequestParam(value = "limit", required = false, defaultValue = "20") int limit,
             @RequestParam(value = "cursor", required = false) String cursor,
             Principal principal) {
-        String callerUid = principal.getName();
-        NotificationFeedResponse response = notificationService.getNotificationFeed(callerUid, limit, cursor);
+        AuthenticatedUser caller = AuthenticatedUser.from(principal);
+        NotificationFeedResponse response = notificationService.getNotificationFeed(caller.uid(), limit, cursor);
         return ResponseEntity.ok(response);
     }
 
@@ -41,16 +42,15 @@ public class NotificationController {
     public ResponseEntity<Map<String, Object>> markAsRead(
             @PathVariable("id") String id,
             Principal principal) {
-        String callerUid = principal.getName();
-        Map<String, Object> result = notificationService.markAsRead(id, callerUid);
+        AuthenticatedUser caller = AuthenticatedUser.from(principal);
+        Map<String, Object> result = notificationService.markAsRead(id, caller.uid());
         return ResponseEntity.ok(result);
     }
 
     @PostMapping("/mark-all-read")
     public ResponseEntity<Map<String, Object>> markAllAsRead(Principal principal) {
-        String callerUid = principal.getName();
-        Map<String, Object> result = notificationService.markAllAsRead(callerUid);
+        AuthenticatedUser caller = AuthenticatedUser.from(principal);
+        Map<String, Object> result = notificationService.markAllAsRead(caller.uid());
         return ResponseEntity.ok(result);
     }
 }
-

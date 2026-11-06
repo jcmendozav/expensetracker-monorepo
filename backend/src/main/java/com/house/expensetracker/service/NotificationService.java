@@ -76,24 +76,41 @@ public class NotificationService {
         try {
             Query query = getCollection()
                     .whereEqualTo("recipientId", callerUid)
-                    .orderBy("createdAt", Query.Direction.DESCENDING)
-                    .limit(queryLimit);
+                    .orderBy("createdAt", Query.Direction.DESCENDING);
+
+            if (cursor != null && !cursor.isBlank()) {
+                DocumentSnapshot cursorDoc = getCollection().document(cursor.trim()).get().get();
+                if (cursorDoc.exists()) {
+                    query = query.startAfter(cursorDoc);
+                }
+            }
+
+            query = query.limit(queryLimit + 1);
 
             QuerySnapshot snapshot = query.get().get();
-            for (QueryDocumentSnapshot doc : snapshot.getDocuments()) {
-                items.add(toDto(fromSnapshot(doc)));
+            List<QueryDocumentSnapshot> docs = snapshot.getDocuments();
+
+            int count = Math.min(docs.size(), queryLimit);
+            for (int i = 0; i < count; i++) {
+                items.add(toDto(fromSnapshot(docs.get(i))));
             }
+
+            String nextCursor = null;
+            if (docs.size() > queryLimit && count > 0) {
+                nextCursor = docs.get(count - 1).getId();
+            }
+
+            return NotificationFeedResponse.builder()
+                    .items(items)
+                    .nextCursor(nextCursor)
+                    .build();
+
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException("Interrupted while fetching notification feed", e);
         } catch (ExecutionException e) {
             throw new RuntimeException("Failed to fetch notification feed: " + e.getMessage(), e);
         }
-
-        return NotificationFeedResponse.builder()
-                .items(items)
-                .nextCursor(null)
-                .build();
     }
 
     public Map<String, Object> markAsRead(String notificationId, String callerUid) {
@@ -194,7 +211,7 @@ public class NotificationService {
                 .build();
     }
 
-    private Map<String, Object> toFirestoreMap(Notification n) {
+    public Map<String, Object> toFirestoreMap(Notification n) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", n.getId());
         map.put("householdId", n.getHouseholdId());
@@ -212,7 +229,7 @@ public class NotificationService {
         return map;
     }
 
-    private Notification fromSnapshot(DocumentSnapshot doc) {
+    public Notification fromSnapshot(DocumentSnapshot doc) {
         Notification n = new Notification();
         n.setId(doc.getId());
         n.setHouseholdId(doc.getString("householdId"));
@@ -233,4 +250,3 @@ public class NotificationService {
         return n;
     }
 }
-

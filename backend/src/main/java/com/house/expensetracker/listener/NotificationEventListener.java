@@ -69,6 +69,26 @@ public class NotificationEventListener {
 
                 notificationService.createNotification(notification);
             }
+
+            // If budget is now depleted, send BUDGET_DEPLETED alert to all household members
+            if ("DEPLETED".equalsIgnoreCase(event.getBudgetStatus()) || event.getCurrentBalanceCents() <= 0) {
+                String depletedMsg = String.format("\"%s\" budget has reached 0.00", event.getBudgetTitle());
+                for (String memberId : household.getMemberIds()) {
+                    Notification depletedNotification = Notification.builder()
+                            .householdId(household.getId())
+                            .recipientId(memberId)
+                            .actorId(actorId)
+                            .budgetId(tx.getBudgetId())
+                            .budgetTitle(event.getBudgetTitle())
+                            .type("BUDGET_DEPLETED")
+                            .title("Budget Depleted")
+                            .message(depletedMsg)
+                            .isRead(false)
+                            .build();
+
+                    notificationService.createNotification(depletedNotification);
+                }
+            }
         } catch (Exception e) {
             // Non-blocking catch
             System.err.println("Failed to dispatch transaction created notification: " + e.getMessage());
@@ -107,4 +127,3 @@ public class NotificationEventListener {
         }
     }
 }
-

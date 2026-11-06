@@ -812,10 +812,10 @@ cd backend && ./gradlew build -x test && cd ../frontend && npm run build
 
 #### Phase 5: Decoupled Activity Alerts & TTL
 
-* [ ] **5.1 Domain Events & Async Publisher:** Enable `@EnableAsync`, define `TransactionCreatedEvent`, `BudgetLowBalanceEvent`, and `BUDGET_DEPLETED` handling in `NotificationEventListener`.
-* [ ] **5.2 Notification Service & Cursor Pagination:** Implement async notification write to `notifications/{id}` with 90-day TTL `expiresAt` field and cursor-based pagination in `getNotificationFeed`. Add `NotificationServiceTest`.
+* [x] **5.1 Domain Events & Async Publisher:** Enable `@EnableAsync`, define `TransactionCreatedEvent`, `BudgetLowBalanceEvent`, and `BUDGET_DEPLETED` handling in `NotificationEventListener`.
+* [x] **5.2 Notification Service & Cursor Pagination:** Implement async notification write to `notifications/{id}` with 90-day TTL `expiresAt` field and cursor-based pagination in `getNotificationFeed`. Add `NotificationServiceTest`.
 * [x] **5.3 Notification Controller Endpoints:** Implement `/api/v1/notifications` (paginated feed, mark read, mark all read).
-* [ ] **5.4 Phase 5 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
+* [x] **5.4 Phase 5 Checkpoint:** Run `cd backend && ./gradlew test` (Ensure green build).
 
 #### Phase 6: Frontend Angular UI Integration (`frontend/AGENTS.md` Compliant)
 
